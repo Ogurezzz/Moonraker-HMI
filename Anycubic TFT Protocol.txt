@@ -16,7 +16,9 @@ J14 - Printing Done
 J15 - Lack of Filament (Filanment runout sensor)
 J16 - Stop
 J17 - Mainboard reset
-J18 -
+J18 - Pause success
+J20 - File Open success
+J21 - File Open failed
 J23 - Show Filament Promt
 
 
