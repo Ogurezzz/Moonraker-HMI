@@ -1,0 +1,52 @@
+J00 - SD Card inserted
+J01 - SD Card removed
+J02 - No SD Card
+J03 - USB Online
+J04 - Print from SD
+J05 - Pause
+J06 - Nozzle Heating
+J07 - Nozzle Heating Done
+J08 - Bed Heating
+J09 - Bed Heating Done
+J10 - T0 Sensor Abnormal
+J11 -
+J12 - Ready
+J13 - Low E0 Temperature
+J14 - Printing Done
+J15 - Lack of Filament (Filanment runout sensor)
+J16 - Stop
+J17 - Mainboard reset
+J18 -
+J23 - Show Filament Promt
+
+
+A0 - Hotend Temp
+A1 - Hotend Target Temp
+A2 - Bed Temp
+A3 - Bed Target Temp
+A4 - Fan Speed
+A5 - Current coordinate
+A6 - Get printing status
+A7 - Get printing time
+A8 - Get SD List
+A9 - Pause print
+A10 - Resume print
+A11 - Stop print
+A12 - Kill. Emergency stop
+A13 - Selection File
+A14 - Start printing
+A15 - Resuming from power outage
+A16 Sxx - Set hotend temperature
+A17 Sxx - Set bed temperature
+A18 Sxx - set fan speed
+A19 - disable steppers
+A20 - Get feedrate
+A21 [X][Y][Z] - Home all or selected axis.
+A22 [X][Y][Z][E] - Move axis
+A23 - preheat pla
+A24 - preheat ABS
+A25 - Cooldown
+A26 - Refresh SD Card
+A27 - servos angles  adjust
+A28 - Filament Test
+A33 - Get version info
