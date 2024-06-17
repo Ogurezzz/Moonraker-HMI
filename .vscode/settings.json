@@ -21,10 +21,13 @@
 		"errno.h": "c",
 		"math.h": "c",
 		"random": "c",
-		"string_view": "c"
+		"string_view": "c",
+		"functional": "c",
+		"*.tcc": "c"
 	},
 	"C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
 		"clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling",
 		"clang-analyzer-security.insecureAPI.strcpy"
-	]
+	],
+	"C_Cpp.default.compilerPath": "/usr/bin/gcc"
 }

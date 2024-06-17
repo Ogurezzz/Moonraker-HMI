@@ -19,21 +19,24 @@ typedef struct string_buffer_s
 
 string_buffer_t strbuf;
 
-static void string_buffer_initialize(string_buffer_t *sb)
+static void
+string_buffer_initialize(string_buffer_t *sb)
 {
 	sb->len = 0;
 	sb->ptr = malloc(sb->len + 1);
 	sb->ptr[0] = '\0';
 }
 
-static void string_buffer_finish(string_buffer_t *sb)
+static void
+string_buffer_finish(string_buffer_t *sb)
 {
 	free(sb->ptr);
 	sb->len = 0;
 	sb->ptr = NULL;
 }
 
-static size_t string_buffer_callback(void *buf, size_t size, size_t nmemb, void *data)
+static size_t
+string_buffer_callback(void *buf, size_t size, size_t nmemb, void *data)
 {
 	string_buffer_t *sb = data;
 	size_t new_len = sb->len + size * nmemb;
@@ -48,12 +51,14 @@ static size_t string_buffer_callback(void *buf, size_t size, size_t nmemb, void 
 	return size * nmemb;
 }
 
-static size_t header_callback(char *buf, size_t size, size_t nmemb, void *data)
+static size_t
+header_callback(char *buf, size_t size, size_t nmemb, void *data)
 {
 	return string_buffer_callback(buf, size, nmemb, data);
 }
 
-static size_t write_callback(void *buf, size_t size, size_t nmemb, void *data)
+static size_t
+write_callback(void *buf, size_t size, size_t nmemb, void *data)
 {
 	return string_buffer_callback(buf, size, nmemb, data);
 }
@@ -114,12 +119,19 @@ int main(int argc, char *argv[])
 	// tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT ON LINUX)
 
 	tty.c_cc[VTIME] = 10; // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
-	tty.c_cc[VMIN] = 0;
+	tty.c_cc[VMIN] = 1;
 
 	// Set in/out baud rate to be 9600
+	#ifdef ANUCUBIC_DGUS_TFT
 	cfsetispeed(&tty, B115200);
 	cfsetospeed(&tty, B115200);
-
+	#endif
+	#ifdef MKS_TFT35
+	//	cfsetispeed(&tty, B115200);
+	//cfsetospeed(&tty, B115200);
+	 cfsetispeed(&tty, B9600);
+	 cfsetospeed(&tty, B9600);
+	#endif
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
 	{
@@ -161,10 +173,11 @@ int main(int argc, char *argv[])
 					{
 						return EXIT_FAILURE;
 					}
-					if (strlen(usart_tx_buf))
-					{
-						// printf("%s", usart_tx_buf);
-					}
+				}
+				else if(st[index] == '\0'){
+					UART_Print("ok\r\n");
+					//write(serial_port, "ok\r\n", strlen("ok\r\n"));
+					printf ("Got Zero\n");
 				}
 				else
 				{
@@ -209,66 +222,79 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	memset(&post_req, '\0', sizeof(post_req));
 	usart_tx_buf[0] = '\0';
 	http_command[0] = '\0';
+	printf("Get: %s\n",line);
+	if (strnlen(line, (size_t) 256) == (size_t) 256)
+	{
+		return EXIT_FAILURE;
+	}
 
-	// int command = -1;
 
-	// sscanf(line, "A%5d S%5d", &command, &value);
-
+#ifdef ANUCUBIC_DGUS_TFT
 	//*** Anycubic Protocol ***//
 	if (!strncmp(line, "A0\r", 3))
 	{
-		sprintf(usart_tx_buf, "A0V %.0f\r\n", printer.extruder_temp);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A0V %.0f\r\n", printer.extruder_temp);
+		//sprintf(usart_tx_buf, "A0V %.0f\r\n", printer.extruder_temp);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A1\r", 3))
 	{
-		sprintf(usart_tx_buf, "A1V %.0f\r\n", printer.extruder_target);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A1V %.0f\r\n", printer.extruder_target);
+		//sprintf(usart_tx_buf, "A1V %.0f\r\n", printer.extruder_target);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A2\r", 3))
 	{
-		sprintf(usart_tx_buf, "A2V %.0f\r\n", printer.heatbed_temp);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A2V %.0f\r\n", printer.heatbed_temp);
+		//sprintf(usart_tx_buf, "A2V %.0f\r\n", printer.heatbed_temp);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A3\r", 3))
 	{
-		sprintf(usart_tx_buf, "A3V %.0f\r\n", printer.heatbed_target);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A3V %.0f\r\n", printer.heatbed_target);
+		//sprintf(usart_tx_buf, "A3V %.0f\r\n", printer.heatbed_target);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A4\r", 3))
 	{
-		sprintf(usart_tx_buf, "A4V %.0f\r\n", printer.fan_speed * 100);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A4V %.0f\r\n", printer.fan_speed * 100);
+		//sprintf(usart_tx_buf, "A4V %.0f\r\n", printer.fan_speed * 100);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A5\r", 3))
 	{
-		sprintf(usart_tx_buf, "A5V X: %.2f Y: %.2f Z: %.2f\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A5V X: %.2f Y: %.2f Z: %.2f\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS);
+		//sprintf(usart_tx_buf, "A5V X: %.2f Y: %.2f Z: %.2f\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A6\r", 3))
 	{
-		sprintf(usart_tx_buf, "A6V %.0f\r\n", printer.progress * 100);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A6V %.0f\r\n", printer.progress * 100);
+		//sprintf(usart_tx_buf, "A6V %.0f\r\n", printer.progress * 100);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A7\r", 3))
 	{
-		sprintf(usart_tx_buf, "A7V %dH %dM\r\n", ((int)printer.print_time) / 3600, (((int)printer.print_time) % 3600) / 60);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A7V %dH %dM\r\n", ((int)printer.print_time) / 3600, (((int)printer.print_time) % 3600) / 60);
+		//sprintf(usart_tx_buf, "A7V %dH %dM\r\n", ((int)printer.print_time) / 3600, (((int)printer.print_time) % 3600) / 60);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A8 ", 3))
 	{
 		int filenum = 0;
 		if (fileList == NULL)
 		{
-			sprintf(usart_tx_buf, "J02\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("J02\r\n");
+			//sprintf(usart_tx_buf, "J02\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 		else
 		{
 			sscanf(line, "A8 S%d\r", &filenum);
 			printf("File #: %d\n", filenum);
-			sprintf(usart_tx_buf, "FN \r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("FN \r\n");
+			//sprintf(usart_tx_buf, "FN \r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 			for (int i = 0; i < 4; i++)
 			{
 				if (getFileNameByNum(fileList, filenum + i, FileName) == NULL)
@@ -278,14 +304,17 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 				else
 				{
 					printf("%s\n", FileName);
-						sprintf(usart_tx_buf, "%s\r\n", FileName);
-						write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-						sprintf(usart_tx_buf, "%s\r\n", FileName);
-						write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+						UART_Print("%s\r\n", FileName);
+						//sprintf(usart_tx_buf, "%s\r\n", FileName);
+						//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+						UART_Print("%s\r\n", FileName);
+						//sprintf(usart_tx_buf, "%s\r\n", FileName);
+						//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 				}
 			}
-			sprintf(usart_tx_buf, "END\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("END\r\n");
+			//sprintf(usart_tx_buf, "END\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 	}
 	else if (!strncmp(line, "A9\r", 3))
@@ -293,8 +322,9 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		sprintf(http_command, "/printer/gcode/script?script=PAUSE");
 		if (curl_execute(http_address, http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
-		sprintf(usart_tx_buf, "J18\r\n");
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("J18\r\n");
+		//sprintf(usart_tx_buf, "J18\r\n");
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A10", 3))
 	{
@@ -308,8 +338,9 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		if (curl_execute(http_address, http_command, &strbuf) == NULL){
 			return EXIT_FAILURE;
 		}
-		sprintf(usart_tx_buf, "J16\r\n");
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("J16\r\n");
+		//sprintf(usart_tx_buf, "J16\r\n");
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A12", 3))
 	{
@@ -329,18 +360,22 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		getFileNameBySmallLeters(fileList,selectedFile);
 		printf("Real Name: %s\n", selectedFile);
 		sprintf(http_command, "/server/files/metadata?filename=%s", selectedFile);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL){
+		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		{
 			return EXIT_FAILURE;
 		}
-		if (strstr(strbuf.ptr,"\"code\": 404") == NULL){
-			sprintf(usart_tx_buf, "J20\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-		}else{
-			sprintf(usart_tx_buf, "J21\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		if (strstr(strbuf.ptr,"\"code\": 404") == NULL)
+		{
+			UART_Print("J20\r\n");
+			//sprintf(usart_tx_buf, "J20\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
-
-
+		else
+		{
+			UART_Print("J21\r\n");
+			//sprintf(usart_tx_buf, "J21\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		}
 	}
 
 	else if (!strncmp(line, "A16", 3))
@@ -348,23 +383,26 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		int value = 0;
 		sscanf(line, "A16 S%d", &value);
 		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL){
+		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		{
 			return EXIT_FAILURE;
 		}
-			sprintf(usart_tx_buf, "J06\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("J06\r\n");
+			//sprintf(usart_tx_buf, "J06\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A17", 3))
 	{
 		int value = 0;
 		sscanf(line, "A17 S%d", &value);
 		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=%d", value);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL){
-return EXIT_FAILURE;
+		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		{
+			return EXIT_FAILURE;
 		}
-			
-			sprintf(usart_tx_buf, "J07\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("J07\r\n");
+			//sprintf(usart_tx_buf, "J07\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A18", 3))
 	{
@@ -382,8 +420,9 @@ return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A20", 3))
 	{
-		sprintf(usart_tx_buf, "A20V %.0f\r\n", printer.feed_rate * 100);
-		write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		UART_Print("A20V %.0f\r\n", printer.feed_rate * 100);
+		//sprintf(usart_tx_buf, "A20V %.0f\r\n", printer.feed_rate * 100);
+		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A21", 3))
 	{
@@ -451,8 +490,9 @@ return EXIT_FAILURE;
 		sprintf(http_command, "/server/files/list");
 		if (curl_execute(http_address, http_command, &strbuf) == NULL)
 		{
-			sprintf(usart_tx_buf, "J02\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("J02\r\n");
+			//sprintf(usart_tx_buf, "J02\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 			return EXIT_FAILURE;
 		}
 		else
@@ -461,14 +501,94 @@ return EXIT_FAILURE;
 				free(fileList);
 			fileList = malloc(strbuf.len);
 			strcpy(fileList, strbuf.ptr);
-			sprintf(usart_tx_buf, "J00\r\n");
-			write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			UART_Print("J00\r\n");
+			//sprintf(usart_tx_buf, "J00\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 	}
 	else
-	{
+		{
 		printf("Unknown request: %s\n", line);
 	}
+#endif
+#ifdef MKS_TFT35
+	if (!strncmp(line, "M105", 4))
+	{
+		UART_Print("ok\r\nB:%.1f /%.1f T0:%.1f /%.1f\r\n", printer.heatbed_temp, printer.heatbed_target, printer.extruder_temp, printer.extruder_target);
+	}
+	else if (!strncmp(line, "M114", 4))
+	{
+		UART_Print("M114 X:%.3f Y:%.3f Z:%.3f E:%3f\r\nok\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS,printer.position.E_POS);
+	}
+	else
+	{
+		/*** Replace all spacet to %20 ***/
+		sprintf(http_command, "/printer/gcode/script?script=");
+		char *command = http_command+strlen(http_command);
+		char *input_line = line;
+		while (*input_line)
+		{
+			if(*input_line != ' ')
+			{
+				*command++ = *input_line++;
+			}
+			else
+			{
+				*command++ = '%';
+				*command++ = '2';
+				*command++ = '0';
+				input_line++;
+			}
+		}
+		command = '\0';
+		//printf("2printer: %s\r\n", strstr(http_command,"=")+1);
+		printf("2printer: %s\r\n", http_command);
+		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+			return EXIT_FAILURE;
+		char *result = strstr(strbuf.ptr,"\"result\": \"");
+		if (!result){
+			result = strstr(strbuf.ptr,"\"error\":");
+			if (!result)
+			{
+				return EXIT_FAILURE;
+			}
+			else
+			{
+				result = strstr(strbuf.ptr,"'message': ");
+				if (!result)
+				{
+					return EXIT_FAILURE;
+				}
+				else
+				{
+					result +=12;
+					char *errMsg = result;
+					while (*result++ != '\'')
+					{
+						//fprintf(stderr,"%c",*result++);
+					}
+					*result = '\0';
+					UART_Print("!! %s\r\nok\r\n",errMsg);
+					//fprintf(stderr,"%s\r\n",errMsg);
+				}
+			}
+		}
+		else
+		{
+			result += 11;
+			int i = 0;
+			while (*result !='\"')
+				usart_tx_buf[i++]=*result++;
+			usart_tx_buf[i++]='\r';
+			usart_tx_buf[i++]='\n';
+			usart_tx_buf[i]='\0';
+				UART_Print( "%s", usart_tx_buf);
+				//fprintf(stdout, "Push: %s", usart_tx_buf);
+				//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+		}
+	}
+
+#endif
 	string_buffer_finish(&strbuf);
 	return EXIT_SUCCESS;
 }
@@ -498,17 +618,13 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf)
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, strbuf);
 	curl_easy_setopt(curl, CURLOPT_HEADERDATA, strbuf);
-	
 	res = curl_easy_perform(curl);
-	while (res == CURLE_COULDNT_CONNECT){
+	while (res == CURLE_COULDNT_CONNECT)
+	{
 		fprintf(stderr, "Request failed: curl_easy_perform(): %s\n", curl_easy_strerror(res));
 		sleep(1);
 		res = curl_easy_perform(curl);
-
 	}
-	
-	
-	
 
 	if (res != CURLE_OK)
 	{
@@ -545,17 +661,12 @@ char *getFileNameByNum(char *fileList, int fileNum, char buf[])
 			}else{
 				buf[j++] = *fileList++;
 			}
-			
 		}
 		if (j >0 ){
 			i++;
 		}
 		buf[j] = '\0';
-		
 	}
-	
-
-	
 	return (&buf[0]);
 }
 

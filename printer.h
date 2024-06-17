@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
-typedef struct 
+typedef struct
 {
 	float extruder_temp;
 	float extruder_target;
@@ -16,6 +16,7 @@ typedef struct
 		float X_POS;
 		float Y_POS;
 		float Z_POS;
+		float E_POS;
 	}position;
 	float feed_rate;
 	uint8_t filamet_detected;

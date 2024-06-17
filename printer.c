@@ -46,7 +46,7 @@ int GetCurrentPosition(char *json, printer_t *printer)
 	json = strstr(json, "position");
 	if (!json)
 		return -1;
-	sscanf(json, "position\": [%f,%f,%f", &printer->position.X_POS, &printer->position.Y_POS, &printer->position.Z_POS);
+	sscanf(json, "position\": [%f,%f,%f,%f", &printer->position.X_POS, &printer->position.Y_POS, &printer->position.Z_POS,&printer->position.E_POS);
 	return 0;
 }
 
