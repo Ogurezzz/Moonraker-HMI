@@ -7,7 +7,7 @@
 #include <inttypes.h>
 #include <ctype.h>
 #include <time.h>
-#include <errno.h>   
+#include <errno.h>
 #include <math.h>
 
 // Additional Libs
@@ -23,9 +23,12 @@
 
 #include "printer.h"
 
-
-
-
+#define UART_Print(...)		do {	char _buf[128]; 			\
+								sprintf(_buf, __VA_ARGS__); 	\
+								printf("2uart: %s",_buf);		\
+								write(serial_port, _buf, strlen(_buf));} while(0)
+//#define ANUCUBIC_DGUS_TFT
+#define MKS_TFT35
 
 
 
