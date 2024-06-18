@@ -23,12 +23,13 @@
 
 #include "printer.h"
 
-#define UART_Print(...)		do {	char _buf[128]; 			\
+#define UART_Print(...)		do {	char _buf[1024]; 			\
 								sprintf(_buf, __VA_ARGS__); 	\
 								printf("2uart: %s",_buf);		\
-								write(serial_port, _buf, strlen(_buf));} while(0)
-//#define ANUCUBIC_DGUS_TFT
-#define MKS_TFT35
+								int r __attribute__((unused)); \
+								r = write(serial_port, _buf, strlen(_buf));} while(0)
+#define ANUCUBIC_DGUS_TFT
+// #define MKS_TFT35
 
 
 

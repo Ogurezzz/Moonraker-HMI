@@ -1,5 +1,7 @@
 
 #include "main.h"
+#define JSMN_HEADER
+#include "jsmn/jsmn.h"
 
 // Allocate memory for read buffer, set size according to your needs
 char read_buf[256];
