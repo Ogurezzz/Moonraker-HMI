@@ -1,5 +1,10 @@
 The first aim of this project is to reuse old Anycubic LCD's (dgus based) after you moved to klipper from Marlin.
 
+Install dependencies
+```
+sudo apt install libcurl4-openssl-dev
+```
+
 Clone and compile:
 ```
 cd ~
