@@ -8,11 +8,12 @@ BINPATH=bin
 
 all: Moonraker-HMI
 
-Moonraker-HMI: main.o printer.o
+Moonraker-HMI: main.o printer.o jsmn.o
 	mkdir -p $(BINPATH)
-	$(CC) $(CFLAGS) $(OBJPATH)/main.o $(OBJPATH)/printer.o -o $(BINPATH)/Moonraker-HMI -lcurl
+	$(CC) $(CFLAGS) $(OBJPATH)/main.o $(OBJPATH)/printer.o $(OBJPATH)/jsmn.o -o $(BINPATH)/Moonraker-HMI -lcurl
 
 main.o: main.c
+	clear
 	mkdir -p $(OBJPATH)
 	$(CC) $(CFLAGS) -c main.c -o $(OBJPATH)/main.o
 
@@ -20,6 +21,9 @@ main.o: main.c
 #	$(CC) $(CFLAGS) json.c -o $(OBJPATH)json.o
 printer.o: printer.c
 	$(CC) $(CFLAGS) -c printer.c -o $(OBJPATH)/printer.o
+
+jsmn.o: jsmn.c
+	$(CC) $(CFLAGS) -c jsmn.c -o $(OBJPATH)/jsmn.o
 
 clean:
 	rm -rf *.o $(OBJPATH) $(BINPATH)
