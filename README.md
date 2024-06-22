@@ -2,6 +2,7 @@ The first aim of this project is to reuse old Anycubic LCD's (dgus based) after 
 
 Install dependencies
 ```
+sudo apt update
 sudo apt install libcurl4-openssl-dev
 ```
 
