@@ -8,13 +8,13 @@ sudo apt install libcurl4-openssl-dev
 Clone and compile:
 ```
 cd ~
-git clone https://github.com/Ogurezzz/Moonraker-HMI.git
+git clone --recurse-submodules https://github.com/Ogurezzz/Moonraker-HMI.git
 cd Moonraker-HMI
 make
 ```
 Make binary executable:
 ```
-sudo cmod +x ./bin/Moonraker-HMI
+sudo chmod +x ./bin/Moonraker-HMI
 ```
 To run it, just connect your old LCD to local machine with USB-UART converter and run (check your converter tty and printer address):
 ```
