@@ -12,7 +12,8 @@
 
 // Additional Libs
 #include <curl/curl.h>
-//#include "json.h"
+#define JSMN_HEADER
+#include "jsmn/jsmn.h"
 
 // Linux headers
 #include <fcntl.h> // Contains file controls like O_RDWR
@@ -25,7 +26,7 @@
 
 #define UART_Print(...)		do {	char _buf[1024]; 			\
 								sprintf(_buf, __VA_ARGS__); 	\
-								printf("2uart: %s",_buf);		\
+								printf("Sent: %s",_buf);		\
 								int r __attribute__((unused)); \
 								r = write(serial_port, _buf, strlen(_buf));} while(0)
 #define ANUCUBIC_DGUS_TFT

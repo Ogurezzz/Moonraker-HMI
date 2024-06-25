@@ -1,8 +1,6 @@
 
 #include "printer.h"
 
-
-
 int GetPrintFeedrate(char *json, printer_t *printer){
 	json = strstr(json, "gcode_move");
 	if (!json)
@@ -132,5 +130,25 @@ int GetFilamenSensorStatus(char *json, printer_t *printer){
 		printer->filamet_detected = 0;
 	}
 
+	return 0;
+}
+
+int GetCurFileName(char *json, printer_t *printer){
+	json = strstr(json, "print_stats");
+	if (!json)
+		return -1;
+	json = strstr(json, "filename");
+	if (!json) return -1;
+	json = strstr(json, ":");
+	if (!json) return -1;
+	json = strstr(json, "\"");
+	if (!json) return -1;
+	json++;
+	char *name = printer->printing_filename;
+	do
+	{
+		*name++ = *json++;
+	} while (*json !='\"' && *json !=',');
+	*name='\0';
 	return 0;
 }

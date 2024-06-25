@@ -6,11 +6,11 @@ OBJPATH=obj
 
 BINPATH=bin
 
-all: Moonraker-HMI
+all: moonraker-hmi
 
-Moonraker-HMI: main.o printer.o jsmn.o
+moonraker-hmi: main.o printer.o jsmn.o
 	mkdir -p $(BINPATH)
-	$(CC) $(CFLAGS) $(OBJPATH)/main.o $(OBJPATH)/printer.o $(OBJPATH)/jsmn.o -o $(BINPATH)/Moonraker-HMI -lcurl
+	$(CC) $(CFLAGS) $(OBJPATH)/main.o $(OBJPATH)/printer.o $(OBJPATH)/jsmn.o -o $(BINPATH)/moonraker-hmi -lcurl
 
 main.o: main.c
 	clear
