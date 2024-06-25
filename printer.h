@@ -22,6 +22,7 @@ typedef struct
 	}position;
 	float feed_rate;
 	uint8_t filamet_detected;
+	char printing_filename[256];
 
 }printer_t;
 //*** PARSER FUNCTIONS PROTOTYPES START ***//
@@ -36,6 +37,7 @@ int GetPrintPercentage(char *json, printer_t *printer);
 int GetPrintDuration(char *json, printer_t *printer);
 int GetPrintFeedrate(char *json, printer_t *printer);
 int GetFilamenSensorStatus(char *json, printer_t *printer);
+int GetCurFileName(char *json, printer_t *printer);
 
 
 //*** PARSER FUNCTIONS PROTOTYPES END ***//
