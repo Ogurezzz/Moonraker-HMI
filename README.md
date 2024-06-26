@@ -15,12 +15,12 @@ make
 ```
 Make binary executable:
 ```
-sudo chmod +x ./bin/Moonraker-HMI
+sudo chmod +x ./bin/moonraker-hmi
 ```
 To run it, just connect your old LCD to local machine with USB-UART converter and run (check your converter tty and printer address):
 ```
-./bin/Moonraker-HMI http://[your klipper address]:7125 [your tty device]
+./bin/moonraker-hmi http://[your klipper address]:7125 [your tty device]
 # example:
-./bin/Moonraker-HMI http://192.168.5.10:7125 /dev/ttyUSB0
+./bin/moonraker-hmi http://192.168.5.10:7125 /dev/ttyUSB0
 ```
 Also you can add this binary to PATH and set autostart.
