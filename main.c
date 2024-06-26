@@ -10,6 +10,26 @@ char selectedFile[256];
 int serial_port;
 char *get_req;
 char *fileList;
+
+jsmn_parser p;
+jsmntok_t *filesList = NULL;
+size_t filesBufSize=128;
+
+/* Function realloc_it() is a wrapper function for standard realloc()
+ * with one difference - it frees old memory pointer in case of realloc
+ * failure. Thus, DO NOT use old data pointer in anyway after call to
+ * realloc_it(). If your code has some kind of fallback algorithm if
+ * memory can't be re-allocated - use standard realloc() instead.
+ */
+static inline void *realloc_it(void *ptrmem, size_t size) {
+  void *p = realloc(ptrmem, size);
+  if (!p) {
+    free(ptrmem);
+    fprintf(stderr, "realloc(): errno=%d\n", errno);
+  }
+  return p;
+}
+
 //*** CURL FUNCTIONS START ***//
 typedef struct string_buffer_s
 {
@@ -75,6 +95,16 @@ int main(int argc, char *argv[])
 	// clock_t start, end,
 	// start = clock();
 	clock_t http_time;
+
+	//*** jasmine init ***//
+	  jsmn_init(&p);
+
+	/* Allocate some tokens as a start */
+	filesList = malloc(sizeof(*filesList) * filesBufSize);
+	if (filesList == NULL) {
+		fprintf(stderr, "malloc(): errno=%d\n", errno);
+		return 3;
+	}
 
 	//*** CURL INIT START ***//
 
@@ -145,6 +175,7 @@ int main(int argc, char *argv[])
 	//  int command = 0;
 	//  int value = 0;
 	http_time = clock();
+	getFileListFromServer(address);
 
 
 	while (1)
@@ -381,15 +412,19 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A16", 3))
 	{
 		int value = 0;
-		sscanf(line, "A16 S%d", &value);
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		char subCmd = '\0';
+		sscanf(line, "A16 %c%d", &value);
+		if (subCmd == 'C' || subCmd == 'S')
 		{
-			return EXIT_FAILURE;
+			sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
+			if (curl_execute(http_address, http_command, &strbuf) == NULL)
+			{
+				return EXIT_FAILURE;
+			}
+				UART_Print("J06\r\n");
+				//sprintf(usart_tx_buf, "J06\r\n");
+				//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
-			UART_Print("J06\r\n");
-			//sprintf(usart_tx_buf, "J06\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A17", 3))
 	{
@@ -487,24 +522,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else if (!strncmp(line, "A26", 3))
 	{
-		sprintf(http_command, "/server/files/list");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
-		{
-			UART_Print("J02\r\n");
-			//sprintf(usart_tx_buf, "J02\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-			return EXIT_FAILURE;
-		}
-		else
-		{
-			if (fileList != NULL)
-				free(fileList);
-			fileList = malloc(strbuf.len);
-			strcpy(fileList, strbuf.ptr);
-			UART_Print("J00\r\n");
-			//sprintf(usart_tx_buf, "J00\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-		}
+		getFileListFromServer(http_address);
 	}
 	else
 		{
@@ -686,4 +704,60 @@ char *getFileNameBySmallLeters(char *fileList, char buf[])
 		}
 	}
 	return (&buf[0]);
+}
+
+void getFileListFromServer(char *http_address)
+{
+		if (curl_execute(http_address, "/server/files/list", &strbuf) == NULL)
+		{
+			UART_Print("J02\r\n");
+			//sprintf(usart_tx_buf, "J02\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+			return EXIT_FAILURE;
+		}
+		else
+		{
+			if (fileList != NULL)
+				free(fileList);
+			fileList = malloc(strbuf.len);
+			strcpy(fileList, strbuf.ptr);
+			UART_Print("J00\r\n");
+			//sprintf(usart_tx_buf, "J00\r\n");
+			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+
+
+			/* JASMINE JSON PARSE */
+			for (;;) {
+				int r = 0;
+				int eof_expected = 0;
+				again:
+				r = jsmn_parse(&p, strbuf.ptr, strbuf.len, filesList, filesBufSize);
+				if (r < 0) {
+				if (r == JSMN_ERROR_NOMEM) {
+					filesBufSize = filesBufSize * 2;
+					filesList = realloc_it(filesList, sizeof(*filesList) * filesBufSize);
+					if (filesList == NULL) {
+					return 3;
+					}
+					goto again;
+				}
+				} else {
+				//dump(strbuf.ptr, filesList, p.toknext, 0);
+				eof_expected = 1;
+				printf("Files Parsed");
+				jsmntok_t *curtok = filesList;
+				while (curtok->end <= strbuf.len)
+				{
+					if (!strncmp(strbuf.ptr+curtok->start, "path", 4))
+					{
+						curtok++;
+						printf("File: %d %.*s\n",curtok->type, curtok->end - curtok->start, strbuf.ptr+curtok->start);
+					}
+					curtok++;
+				}
+				break;
+				}
+			}
+
+		}
 }
