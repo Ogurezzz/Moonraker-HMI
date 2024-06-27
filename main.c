@@ -90,6 +90,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 char *getFileNameByNum(char *fileList, int fileNum, char buf[]);
 char *getFileNameBySmallLeters(char *fileList, char buf[]);
 char *curl_execute(char *address, char *command, string_buffer_t *strbuf);
+static int getFileListFromServer(char *http_address);
 int main(int argc, char *argv[])
 {
 	// clock_t start, end,
@@ -175,7 +176,8 @@ int main(int argc, char *argv[])
 	//  int command = 0;
 	//  int value = 0;
 	http_time = clock();
-	getFileListFromServer(address);
+	if (getFileListFromServer(address))
+		return EXIT_FAILURE;
 
 
 	while (1)
@@ -413,7 +415,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	{
 		int value = 0;
 		char subCmd = '\0';
-		sscanf(line, "A16 %c%d", &value);
+		sscanf(line, "A16 %c%d", &subCmd, &value);
 		if (subCmd == 'C' || subCmd == 'S')
 		{
 			sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
@@ -522,7 +524,8 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else if (!strncmp(line, "A26", 3))
 	{
-		getFileListFromServer(http_address);
+		if (getFileListFromServer(http_address))
+			return EXIT_FAILURE;
 	}
 	else
 		{
@@ -706,7 +709,7 @@ char *getFileNameBySmallLeters(char *fileList, char buf[])
 	return (&buf[0]);
 }
 
-void getFileListFromServer(char *http_address)
+static int getFileListFromServer(char *http_address)
 {
 		if (curl_execute(http_address, "/server/files/list", &strbuf) == NULL)
 		{
@@ -729,7 +732,7 @@ void getFileListFromServer(char *http_address)
 			/* JASMINE JSON PARSE */
 			for (;;) {
 				int r = 0;
-				int eof_expected = 0;
+				// int eof_expected = 0;
 				again:
 				r = jsmn_parse(&p, strbuf.ptr, strbuf.len, filesList, filesBufSize);
 				if (r < 0) {
@@ -743,7 +746,7 @@ void getFileListFromServer(char *http_address)
 				}
 				} else {
 				//dump(strbuf.ptr, filesList, p.toknext, 0);
-				eof_expected = 1;
+				// eof_expected = 1;
 				printf("Files Parsed");
 				jsmntok_t *curtok = filesList;
 				while (curtok->end <= strbuf.len)
@@ -760,4 +763,5 @@ void getFileListFromServer(char *http_address)
 			}
 
 		}
+		return EXIT_SUCCESS;
 }
