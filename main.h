@@ -32,6 +32,11 @@
 #define ANUCUBIC_DGUS_TFT
 // #define MKS_TFT35
 
+#ifdef DEBUG
+#define DEBUG_LOG(...)		do{ printf(__VA_ARGS__);}while(0)
+#else
+#define DEBUG_LOG(...)		do{}while(0)
+#endif
 
 
 
