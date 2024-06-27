@@ -13,6 +13,12 @@ git clone --recurse-submodules https://github.com/Ogurezzz/Moonraker-HMI.git
 cd Moonraker-HMI
 make
 ```
+Update:
+```
+cd ~/Moonraker-HMI
+git submodule update --init --recursive
+make
+```
 Make binary executable:
 ```
 sudo chmod +x ./bin/moonraker-hmi
