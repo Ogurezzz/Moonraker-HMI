@@ -29,8 +29,22 @@
 								printf("Sent: %s",_buf);		\
 								int r __attribute__((unused)); \
 								r = write(serial_port, _buf, strlen(_buf));} while(0)
-#define ANUCUBIC_DGUS_TFT
-// #define MKS_TFT35
+
+//=============================================================================
+//=======================   LCD / Controller Selection  =======================
+//=============================================================================
+
+#define ANYCUBIC_DGUS_TFT		//Stock Anycubic i3 mega LCD
+// #define MKS_TFT35			//Makerbase TFT35
+
+/* Sanity checks */
+#if (defined(ANYCUBIC_DGUS_TFT) &&	\
+	defined(MKS_TFT35)) ||			\
+									\
+	(!defined(ANYCUBIC_DGUS_TFT) &&	\
+	!defined(MKS_TFT35))
+	#error "Only one LCD protocol should be defined"
+#endif
 
 #ifdef DEBUG
 #define DEBUG_LOG(...)		do{ printf(__VA_ARGS__);}while(0)

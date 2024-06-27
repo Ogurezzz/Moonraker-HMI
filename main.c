@@ -37,8 +37,21 @@ typedef struct string_buffer_s
 	size_t len;
 } string_buffer_t;
 
+typedef struct file
+{
+		jsmntok_t *name;
+		double modified;
+} file_t;
+
+typedef struct files
+{
+	file_t *f;
+	size_t len;
+	string_buffer_t filesRespond;
+} jsmntok_arr_t;
+
 string_buffer_t strbuf;
-string_buffer_t filesRespond;
+jsmntok_arr_t files;
 
 static void
 string_buffer_initialize(string_buffer_t *sb)
@@ -92,6 +105,13 @@ char *getFileNameByNum(char *fileList, int fileNum, char buf[]);
 char *getFileNameBySmallLeters(char *fileList, char buf[]);
 char *curl_execute(char *address, char *command, string_buffer_t *strbuf);
 static int getFileListFromServer(char *http_address);
+int compare_files  (const void* a, const void* b);
+
+int min(int a, int b)
+{
+	return a < b ? a : b;
+}
+
 int main(int argc, char *argv[])
 {
 	// clock_t start, end,
@@ -154,7 +174,7 @@ int main(int argc, char *argv[])
 	tty.c_cc[VMIN] = 1;
 
 	// Set in/out baud rate to be 9600
-	#ifdef ANUCUBIC_DGUS_TFT
+	#ifdef ANYCUBIC_DGUS_TFT
 	cfsetispeed(&tty, B115200);
 	cfsetospeed(&tty, B115200);
 	#endif
@@ -263,7 +283,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 
 
-#ifdef ANUCUBIC_DGUS_TFT
+#ifdef ANYCUBIC_DGUS_TFT
 	//*** Anycubic Protocol ***//
 	if (!strncmp(line, "A0\r", 3))
 	{
@@ -314,32 +334,19 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A8 ", 3))
 	{
 		int filenum = 0;
-		if (fileList == NULL)
+		if (files.filesRespond.ptr == NULL)
 		{
 			UART_Print("J02\r\n");
 		}
 		else
 		{
 			sscanf(line, "A8 S%d\r", &filenum);
-			// printf("File #: %d\n", filenum);
+			DEBUG_LOG("File #: %d\n", filenum);
 			UART_Print("FN \r\n");
-			jsmntok_t *curtok = filesList;
-			for (int i = filenum; i < (filenum+4); i++)
+			for (int i = filenum; i < (filenum+4) && i < files.len; i++)
 			{
-				int n = 0;
-				while (curtok->end <= filesRespond.len)
-				{
-					if (!strncmp(filesRespond.ptr+curtok->start, "path", 4))
-					{
-						curtok++;
-						if (n++ != i)
-							continue;
-						UART_Print("%.*s\r\n", curtok->end - curtok->start, filesRespond.ptr+curtok->start);
-						UART_Print("%.*s\r\n", curtok->end - curtok->start, filesRespond.ptr+curtok->start);
-						break;
-					}
-					curtok++;
-				}
+				UART_Print("%.*s\r\n", files.f[i].name->size, files.filesRespond.ptr+files.f[i].name->start);
+				UART_Print("%.*s\r\n", files.f[i].name->size, files.filesRespond.ptr+files.f[i].name->start);
 			}
 			UART_Print("END\r\n");
 		}
@@ -382,9 +389,9 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		}
 		selectedFile[i] = '\0';
 		printf("Selected: %s\n", selectedFile);
-		// getFileNameBySmallLeters(fileList,selectedFile);
+		getFileNameBySmallLeters(fileList,selectedFile);
 		// printf("Real Name: %s\n", selectedFile);
-		sprintf(http_command, "/server/files/metadata?filename=%s", selectedFile);
+		// sprintf(http_command, "/server/files/metadata?filename=%s", selectedFile);
 		DEBUG_LOG("%s\n", http_command);
 		if (curl_execute(http_address, http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
@@ -702,25 +709,19 @@ char *getFileNameBySmallLeters(char *fileList, char buf[])
 
 static int getFileListFromServer(char *http_address)
 {
-		if (curl_execute(http_address, "/server/files/list", &filesRespond) == NULL)
+		if (curl_execute(http_address, "/server/files/list", &files.filesRespond) == NULL)
 		{
 			UART_Print("J02\r\n");
 			return EXIT_FAILURE;
 		}
 		else
 		{
-			if (fileList != NULL)
-				free(fileList);
-			fileList = malloc(filesRespond.len);
-			strcpy(fileList, filesRespond.ptr);
 			UART_Print("J00\r\n");
-
-
 			/* JASMINE JSON PARSE */
 			for (;;) {
 				int r = 0;
 				again:
-				r = jsmn_parse(&p, filesRespond.ptr, filesRespond.len, filesList, filesBufSize);
+				r = jsmn_parse(&p, files.filesRespond.ptr, files.filesRespond.len, filesList, filesBufSize);
 				if (r < 0) {
 				if (r == JSMN_ERROR_NOMEM) {
 					filesBufSize = filesBufSize * 2;
@@ -733,14 +734,43 @@ static int getFileListFromServer(char *http_address)
 				} else {
 				DEBUG_LOG("Files Parsed\n");
 				jsmntok_t *curtok = filesList;
-				while (curtok->end <= filesRespond.len)
+				files.len = 0;
+				while (curtok->end <= files.filesRespond.len)
 				{
-					if (!strncmp(filesRespond.ptr+curtok->start, "path", 4))
+					if (!strncmp(files.filesRespond.ptr+curtok->start, "path", 4))
 					{
 						curtok++;
-						DEBUG_LOG("File: %d %.*s\n",curtok->type, curtok->end - curtok->start, filesRespond.ptr+curtok->start);
+						files.len++;
+						DEBUG_LOG("File: %d %.*s\n",curtok->type, curtok->end - curtok->start, files.filesRespond.ptr+curtok->start);
 					}
 					curtok++;
+				}
+				files.f = malloc(sizeof(file_t)*files.len);
+				curtok = filesList;
+				size_t n = 0;
+				while (curtok->end <= files.filesRespond.len)
+				{
+					if (!strncmp(files.filesRespond.ptr+curtok->start, "path", 4))
+					{
+						curtok++;
+						files.f[n].name = curtok;
+						files.f[n].name->size = curtok->end-curtok->start;
+						curtok+=2;
+						sscanf(files.filesRespond.ptr+curtok->start,"%lf", &files.f[n].modified);
+						DEBUG_LOG("File: #%3ld: %40.*s Date: %lf\n",n, min(40,files.f[n].name->size), files.filesRespond.ptr+files.f[n].name->start,
+																 files.f[n].modified);
+						n++;
+					}
+					curtok++;
+				}
+/* Sort files by date */
+				qsort(files.f, files.len, sizeof(file_t), compare_files);
+
+				DEBUG_LOG("Sorted list of files\n");
+				for (size_t i=0; i<files.len;i++)
+				{
+					DEBUG_LOG("File: #%3ld: %40.*s Date: %lf\n",i, min(40,files.f[i].name->size), files.filesRespond.ptr+files.f[i].name->start,
+																 files.f[i].modified);
 				}
 				break;
 				}
@@ -748,4 +778,9 @@ static int getFileListFromServer(char *http_address)
 
 		}
 		return EXIT_SUCCESS;
+}
+
+int compare_files  (const void* a, const void* b)
+{
+    return (((file_t*)b)->modified - ((file_t*)a)->modified);
 }
