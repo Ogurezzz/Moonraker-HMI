@@ -38,6 +38,7 @@ typedef struct string_buffer_s
 } string_buffer_t;
 
 string_buffer_t strbuf;
+string_buffer_t filesRespond;
 
 static void
 string_buffer_initialize(string_buffer_t *sb)
@@ -309,8 +310,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A7\r", 3))
 	{
 		UART_Print("A7V %dH %dM\r\n", ((int)printer.print_time) / 3600, (((int)printer.print_time) % 3600) / 60);
-		//sprintf(usart_tx_buf, "A7V %dH %dM\r\n", ((int)printer.print_time) / 3600, (((int)printer.print_time) % 3600) / 60);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A8 ", 3))
 	{
@@ -318,36 +317,31 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		if (fileList == NULL)
 		{
 			UART_Print("J02\r\n");
-			//sprintf(usart_tx_buf, "J02\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 		else
 		{
 			sscanf(line, "A8 S%d\r", &filenum);
-			printf("File #: %d\n", filenum);
+			// printf("File #: %d\n", filenum);
 			UART_Print("FN \r\n");
-			//sprintf(usart_tx_buf, "FN \r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-			for (int i = 0; i < 4; i++)
+			jsmntok_t *curtok = filesList;
+			for (int i = filenum; i < (filenum+4); i++)
 			{
-				if (getFileNameByNum(fileList, filenum + i, FileName) == NULL)
+				int n = 0;
+				while (curtok->end <= filesRespond.len)
 				{
-					break;
-				}
-				else
-				{
-					printf("%s\n", FileName);
-						UART_Print("%s\r\n", FileName);
-						//sprintf(usart_tx_buf, "%s\r\n", FileName);
-						//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-						UART_Print("%s\r\n", FileName);
-						//sprintf(usart_tx_buf, "%s\r\n", FileName);
-						//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
+					if (!strncmp(filesRespond.ptr+curtok->start, "path", 4))
+					{
+						curtok++;
+						if (n++ != i)
+							continue;
+						UART_Print("%.*s\r\n", curtok->end - curtok->start, filesRespond.ptr+curtok->start);
+						UART_Print("%.*s\r\n", curtok->end - curtok->start, filesRespond.ptr+curtok->start);
+						break;
+					}
+					curtok++;
 				}
 			}
 			UART_Print("END\r\n");
-			//sprintf(usart_tx_buf, "END\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 	}
 	else if (!strncmp(line, "A9\r", 3))
@@ -372,8 +366,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			return EXIT_FAILURE;
 		}
 		UART_Print("J16\r\n");
-		//sprintf(usart_tx_buf, "J16\r\n");
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A12", 3))
 	{
@@ -390,25 +382,24 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		}
 		selectedFile[i] = '\0';
 		printf("Selected: %s\n", selectedFile);
-		getFileNameBySmallLeters(fileList,selectedFile);
-		printf("Real Name: %s\n", selectedFile);
+		// getFileNameBySmallLeters(fileList,selectedFile);
+		// printf("Real Name: %s\n", selectedFile);
 		sprintf(http_command, "/server/files/metadata?filename=%s", selectedFile);
+		DEBUG_LOG("%s\n", http_command);
 		if (curl_execute(http_address, http_command, &strbuf) == NULL)
-		{
 			return EXIT_FAILURE;
-		}
 		if (strstr(strbuf.ptr,"\"code\": 404") == NULL)
-		{
 			UART_Print("J20\r\n");
-			//sprintf(usart_tx_buf, "J20\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-		}
 		else
-		{
 			UART_Print("J21\r\n");
-			//sprintf(usart_tx_buf, "J21\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
-		}
+	}
+	else if (!strncmp(line, "A14", 3))
+	{
+		DEBUG_LOG("Start printing file: \"%s\"\n",selectedFile);
+		sprintf(http_command, "/printer/print/start?filename=%s",selectedFile);
+		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+			return EXIT_FAILURE;
+		UART_Print("J04\r\n");
 	}
 
 	else if (!strncmp(line, "A16", 3))
@@ -711,30 +702,25 @@ char *getFileNameBySmallLeters(char *fileList, char buf[])
 
 static int getFileListFromServer(char *http_address)
 {
-		if (curl_execute(http_address, "/server/files/list", &strbuf) == NULL)
+		if (curl_execute(http_address, "/server/files/list", &filesRespond) == NULL)
 		{
 			UART_Print("J02\r\n");
-			//sprintf(usart_tx_buf, "J02\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 			return EXIT_FAILURE;
 		}
 		else
 		{
 			if (fileList != NULL)
 				free(fileList);
-			fileList = malloc(strbuf.len);
-			strcpy(fileList, strbuf.ptr);
+			fileList = malloc(filesRespond.len);
+			strcpy(fileList, filesRespond.ptr);
 			UART_Print("J00\r\n");
-			//sprintf(usart_tx_buf, "J00\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 
 
 			/* JASMINE JSON PARSE */
 			for (;;) {
 				int r = 0;
-				// int eof_expected = 0;
 				again:
-				r = jsmn_parse(&p, strbuf.ptr, strbuf.len, filesList, filesBufSize);
+				r = jsmn_parse(&p, filesRespond.ptr, filesRespond.len, filesList, filesBufSize);
 				if (r < 0) {
 				if (r == JSMN_ERROR_NOMEM) {
 					filesBufSize = filesBufSize * 2;
@@ -745,16 +731,14 @@ static int getFileListFromServer(char *http_address)
 					goto again;
 				}
 				} else {
-				//dump(strbuf.ptr, filesList, p.toknext, 0);
-				// eof_expected = 1;
-				printf("Files Parsed");
+				DEBUG_LOG("Files Parsed\n");
 				jsmntok_t *curtok = filesList;
-				while (curtok->end <= strbuf.len)
+				while (curtok->end <= filesRespond.len)
 				{
-					if (!strncmp(strbuf.ptr+curtok->start, "path", 4))
+					if (!strncmp(filesRespond.ptr+curtok->start, "path", 4))
 					{
 						curtok++;
-						printf("File: %d %.*s\n",curtok->type, curtok->end - curtok->start, strbuf.ptr+curtok->start);
+						DEBUG_LOG("File: %d %.*s\n",curtok->type, curtok->end - curtok->start, filesRespond.ptr+curtok->start);
 					}
 					curtok++;
 				}

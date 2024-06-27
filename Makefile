@@ -1,6 +1,6 @@
 CC=gcc
 
-CFLAGS=-Og -ggdb -Wall -fdiagnostics-color=always
+CFLAGS=-Og -ggdb -Wall -fdiagnostics-color=always -DDEBUG
 
 OBJPATH=obj
 
