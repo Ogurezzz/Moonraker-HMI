@@ -10,6 +10,7 @@ char selectedFile[256];
 int serial_port;
 char *get_req;
 char *fileList;
+char *host;
 
 jsmn_parser p;
 jsmntok_t *filesList = NULL;
@@ -30,6 +31,12 @@ static inline void *realloc_it(void *ptrmem, size_t size) {
   return p;
 }
 
+typedef enum
+{
+	CURL_GET,
+	CURL_POST
+}CURL_TYPE;
+
 //*** CURL FUNCTIONS START ***//
 typedef struct string_buffer_s
 {
@@ -43,7 +50,7 @@ typedef struct file
 		double modified;
 } file_t;
 
-typedef struct files
+typedef struct
 {
 	file_t *f;
 	size_t len;
@@ -102,9 +109,9 @@ printer_t printer;
 int msleep(long msec);
 int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_address);
 char *getFileNameByNum(char *fileList, int fileNum, char buf[]);
-char *getFileNameBySmallLeters(char *fileList, char buf[]);
-char *curl_execute(char *address, char *command, string_buffer_t *strbuf);
-static int getFileListFromServer(char *http_address);
+jsmntok_t * getFileNameBySmallLeters(jsmntok_arr_t *fileList, const char *small_letters_name);
+char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_TYPE request_type);
+static int getFileListFromServer(void);
 int compare_files  (const void* a, const void* b);
 
 int min(int a, int b)
@@ -130,8 +137,9 @@ int main(int argc, char *argv[])
 
 	//*** CURL INIT START ***//
 
-	char *address = argv[1];
-	char *get_command = "/printer/objects/query?extruder=temperature,target&heater_bed=temperature,target&fan=speed&gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&filament_switch_sensor%20Runout_Sensor=filament_detected";
+	host = argv[1];
+	char *status_querry_address = "/printer/objects/query";
+	char *status_querry_command = "?extruder=temperature,target&heater_bed=temperature,target&fan=speed&gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&filament_switch_sensor%20Runout_Sensor=filament_detected";
 
 	//*** CURL INIT END ***//
 
@@ -197,7 +205,7 @@ int main(int argc, char *argv[])
 	//  int command = 0;
 	//  int value = 0;
 	http_time = clock();
-	if (getFileListFromServer(address))
+	if (getFileListFromServer())
 		return EXIT_FAILURE;
 
 
@@ -223,7 +231,7 @@ int main(int argc, char *argv[])
 				{
 					st[index] = '\0';
 					index = 0;
-					if (line_process(st, usart_tx_buf, post_req, address) == EXIT_FAILURE)
+					if (line_process(st, usart_tx_buf, post_req, host) == EXIT_FAILURE)
 					{
 						return EXIT_FAILURE;
 					}
@@ -243,7 +251,7 @@ int main(int argc, char *argv[])
 		if (clock() - http_time > 0.5 && bytes_read >= 0)
 		{
 			http_time = clock();
-			char *json = curl_execute(address, get_command, &strbuf);
+			char *json = curl_execute(status_querry_address, status_querry_command, &strbuf, CURL_GET);
 			if (json == NULL)
 				return EXIT_FAILURE;
 
@@ -345,16 +353,15 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			UART_Print("FN \r\n");
 			for (int i = filenum; i < (filenum+4) && i < files.len; i++)
 			{
-				UART_Print("%.*s\r\n", files.f[i].name->size, files.filesRespond.ptr+files.f[i].name->start);
-				UART_Print("%.*s\r\n", files.f[i].name->size, files.filesRespond.ptr+files.f[i].name->start);
+				UART_Print("%.*s\r\n", min(files.f[i].name->size,29), files.filesRespond.ptr+files.f[i].name->start);
+				UART_Print("%.*s\r\n",  min(files.f[i].name->size,22), files.filesRespond.ptr+files.f[i].name->start);
 			}
 			UART_Print("END\r\n");
 		}
 	}
 	else if (!strncmp(line, "A9\r", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=PAUSE");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		if (curl_execute("/printer/gcode/script", "script=PAUSE", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 		UART_Print("J18\r\n");
 		//sprintf(usart_tx_buf, "J18\r\n");
@@ -362,22 +369,22 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else if (!strncmp(line, "A10", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=RESUME");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		// sprintf(http_command, "/printer/gcode/script?script=RESUME");
+		if (curl_execute("/printer/gcode/script", "script=RESUME", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A11", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=STOP");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL){
+		// sprintf(http_command, "/printer/gcode/script?script=STOP");
+		if (curl_execute("/printer/gcode/script", "script=STOP", &strbuf, CURL_POST) == NULL){
 			return EXIT_FAILURE;
 		}
 		UART_Print("J16\r\n");
 	}
 	else if (!strncmp(line, "A12", 3))
 	{
-		sprintf(http_command, "/printer/emergency_stop");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		// sprintf(http_command, "/printer/emergency_stop");
+		if (curl_execute("/printer/emergency_stop", "", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A13", 3))
@@ -389,11 +396,17 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		}
 		selectedFile[i] = '\0';
 		printf("Selected: %s\n", selectedFile);
-		getFileNameBySmallLeters(fileList,selectedFile);
-		// printf("Real Name: %s\n", selectedFile);
-		// sprintf(http_command, "/server/files/metadata?filename=%s", selectedFile);
-		DEBUG_LOG("%s\n", http_command);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		jsmntok_t *real_name = getFileNameBySmallLeters(&files,selectedFile);
+		if (real_name == NULL)
+		{
+			DEBUG_LOG("Filename \"%s\" not found\n", selectedFile);
+			return 0;
+		}
+		printf("Real Name: %.*s\n", real_name->size , files.filesRespond.ptr + real_name->start);
+		sprintf(selectedFile,"%.*s",real_name->size , files.filesRespond.ptr + real_name->start);
+		sprintf(http_command, "filename=%s", selectedFile);
+		DEBUG_LOG("request: %s\n", http_command);
+		if (curl_execute("/server/files/metadata", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 		if (strstr(strbuf.ptr,"\"code\": 404") == NULL)
 			UART_Print("J20\r\n");
@@ -403,8 +416,8 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A14", 3))
 	{
 		DEBUG_LOG("Start printing file: \"%s\"\n",selectedFile);
-		sprintf(http_command, "/printer/print/start?filename=%s",selectedFile);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "filename=%s",selectedFile);
+		if (curl_execute("/printer/print/start", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 		UART_Print("J04\r\n");
 	}
@@ -416,8 +429,8 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		sscanf(line, "A16 %c%d", &subCmd, &value);
 		if (subCmd == 'C' || subCmd == 'S')
 		{
-			sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
-			if (curl_execute(http_address, http_command, &strbuf) == NULL)
+			sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d", value);
+			if (curl_execute("/printer/gcode/script", http_command, &strbuf,CURL_POST) == NULL)
 			{
 				return EXIT_FAILURE;
 			}
@@ -430,8 +443,8 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	{
 		int value = 0;
 		sscanf(line, "A17 S%d", &value);
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=%d", value);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=%d", value);
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 		{
 			return EXIT_FAILURE;
 		}
@@ -443,14 +456,14 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	{
 		int value = 0;
 		sscanf(line, "A18 S%d", &value);
-		sprintf(http_command, "/printer/gcode/script?script=M106%%20S%d", value);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=M106%%20S%d", value);
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A19", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=M84");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=M84");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A20", 3))
@@ -468,13 +481,13 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			axis[0] = 'Y';
 		if (strchr(line, 'Z'))
 			axis[0] = 'Z';
-		sprintf(http_command, "/printer/gcode/script?script=G28%s", axis);
+		sprintf(http_command, "script=G28%s", axis);
 		if (axis[0])
 		{
 			strcat(http_command, "%20");
 			strcat(http_command, axis);
 		}
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A22", 3))
@@ -483,46 +496,46 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		int length = 0;
 		int speed = 0;
 		sscanf(line, "A22 %c %dF%d", &axis, &length, &speed);
-		sprintf(http_command, "/printer/gcode/script?script=G91");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=G91");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
-		sprintf(http_command, "/printer/gcode/script?script=G1%%20%c%d%%20F%d", axis, length, speed);
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=G1%%20%c%d%%20F%d", axis, length, speed);
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
-		sprintf(http_command, "/printer/gcode/script?script=G90");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=G90");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A23", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=230");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=230");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=80");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=80");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A24", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=245");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=245");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=100");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=100");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A25", 3))
 	{
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=0");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=0");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
-		sprintf(http_command, "/printer/gcode/script?script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=0");
-		if (curl_execute(http_address, http_command, &strbuf) == NULL)
+		sprintf(http_command, "script=SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=0");
+		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A26", 3))
 	{
-		if (getFileListFromServer(http_address))
+		if (getFileListFromServer())
 			return EXIT_FAILURE;
 	}
 	else
@@ -612,13 +625,15 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	return EXIT_SUCCESS;
 }
 
-char *curl_execute(char *address, char *command, string_buffer_t *strbuf)
+char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_TYPE request_type)
 {
 	//*** HTTP REQUEST START ***//
 	string_buffer_initialize(strbuf);
-	char *url = malloc(strlen(address) + strlen(command) + 1);
-	strcpy(url, address);
-	strcat(url, command);
+	char *url = malloc(strlen(host) + strlen(address) + strlen(command) + 1);
+	strcpy(url, host);
+	strcat(url, address);
+	if (request_type == CURL_GET)
+		strcat(url, command);
 	CURL *curl;
 	CURLcode res;
 	curl = curl_easy_init();
@@ -632,6 +647,8 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf)
 	}
 
 	curl_easy_setopt(curl, CURLOPT_URL, url);
+	if (request_type == CURL_POST)
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, command);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
@@ -689,27 +706,36 @@ char *getFileNameByNum(char *fileList, int fileNum, char buf[])
 	return (&buf[0]);
 }
 
-char *getFileNameBySmallLeters(char *fileList, char buf[])
+jsmntok_t *getFileNameBySmallLeters(jsmntok_arr_t *fileLst, const char *small_letters_name)
 {
-	int i = 0;
-	if (fileList == NULL) return NULL;
-	while (*fileList){
-		if (tolower(*fileList)==tolower(buf[i])){
-			buf[i++] = *fileList++;
-			if (buf[i]=='\0') {
-				break;
-			}
-		}else{
-			i = 0;
-			fileList++;
+	size_t pos = 0;
+
+	if (fileLst == NULL || small_letters_name == NULL)
+		return NULL;
+	while (pos<fileLst->len)
+	{
+		// char *normalName = fileLst->filesRespond.ptr + (*fileLst).f[pos].name->start;
+		//char *smallName = small_letters_name;
+		char *normalName = malloc((*fileLst).f[pos].name->size + 1);
+		strncpy(normalName, (fileLst->filesRespond.ptr + (*fileLst).f[pos].name->start),(*fileLst).f[pos].name->size);
+		for (char *p = normalName; *p; p++)
+		{
+			*p=tolower(*p);
 		}
+		if (!strncmp(normalName,small_letters_name,(*fileLst).f[pos].name->size))
+		{
+			free(normalName);
+			return (*fileLst).f[pos].name;
+		}
+		free(normalName);
+		pos++;
 	}
-	return (&buf[0]);
+	return NULL;
 }
 
-static int getFileListFromServer(char *http_address)
+static int getFileListFromServer(void)
 {
-		if (curl_execute(http_address, "/server/files/list", &files.filesRespond) == NULL)
+		if (curl_execute("/server/files/list","", &files.filesRespond, CURL_GET) == NULL)
 		{
 			UART_Print("J02\r\n");
 			return EXIT_FAILURE;
