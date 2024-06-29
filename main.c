@@ -121,8 +121,6 @@ int min(int a, int b)
 
 int main(int argc, char *argv[])
 {
-	// clock_t start, end,
-	// start = clock();
 	clock_t http_time;
 
 	//*** jasmine init ***//
@@ -201,9 +199,6 @@ int main(int argc, char *argv[])
 
 	//*** SERIAL INIT END ***//
 
-	// uint8_t bufindex = 0;
-	//  int command = 0;
-	//  int value = 0;
 	http_time = clock();
 	if (getFileListFromServer())
 		return EXIT_FAILURE;
@@ -296,44 +291,30 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	if (!strncmp(line, "A0\r", 3))
 	{
 		UART_Print("A0V %.0f\r\n", printer.extruder_temp);
-		//sprintf(usart_tx_buf, "A0V %.0f\r\n", printer.extruder_temp);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A1\r", 3))
 	{
 		UART_Print("A1V %.0f\r\n", printer.extruder_target);
-		//sprintf(usart_tx_buf, "A1V %.0f\r\n", printer.extruder_target);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A2\r", 3))
 	{
 		UART_Print("A2V %.0f\r\n", printer.heatbed_temp);
-		//sprintf(usart_tx_buf, "A2V %.0f\r\n", printer.heatbed_temp);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A3\r", 3))
 	{
 		UART_Print("A3V %.0f\r\n", printer.heatbed_target);
-		//sprintf(usart_tx_buf, "A3V %.0f\r\n", printer.heatbed_target);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A4\r", 3))
 	{
 		UART_Print("A4V %.0f\r\n", printer.fan_speed * 100);
-		//sprintf(usart_tx_buf, "A4V %.0f\r\n", printer.fan_speed * 100);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A5\r", 3))
 	{
 		UART_Print("A5V X: %.2f Y: %.2f Z: %.2f\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS);
-		//sprintf(usart_tx_buf, "A5V X: %.2f Y: %.2f Z: %.2f\r\n", printer.position.X_POS, printer.position.Y_POS, printer.position.Z_POS);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A6\r", 3))
 	{
 		UART_Print("A6V %.0f\r\n", printer.progress * 100);
-		//sprintf(usart_tx_buf, "A6V %.0f\r\n", printer.progress * 100);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A7\r", 3))
 	{
@@ -364,12 +345,9 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		if (curl_execute("/printer/gcode/script", "script=PAUSE", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 		UART_Print("J18\r\n");
-		//sprintf(usart_tx_buf, "J18\r\n");
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A10", 3))
 	{
-		// sprintf(http_command, "/printer/gcode/script?script=RESUME");
 		if (curl_execute("/printer/gcode/script", "script=RESUME", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
@@ -383,7 +361,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else if (!strncmp(line, "A12", 3))
 	{
-		// sprintf(http_command, "/printer/emergency_stop");
 		if (curl_execute("/printer/emergency_stop", "", &strbuf, CURL_POST) == NULL)
 			return EXIT_FAILURE;
 	}
@@ -435,8 +412,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 				return EXIT_FAILURE;
 			}
 				UART_Print("J06\r\n");
-				//sprintf(usart_tx_buf, "J06\r\n");
-				//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 	}
 	else if (!strncmp(line, "A17", 3))
@@ -449,8 +424,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			return EXIT_FAILURE;
 		}
 			UART_Print("J07\r\n");
-			//sprintf(usart_tx_buf, "J07\r\n");
-			//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A18", 3))
 	{
@@ -469,26 +442,17 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A20", 3))
 	{
 		UART_Print("A20V %.0f\r\n", printer.feed_rate * 100);
-		//sprintf(usart_tx_buf, "A20V %.0f\r\n", printer.feed_rate * 100);
-		//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 	}
 	else if (!strncmp(line, "A21", 3))
 	{
-		char axis[2] = {'\0', '\0'};
-		if (strchr(line, 'X'))
-			axis[0] = 'X';
-		if (strchr(line, 'Y'))
-			axis[0] = 'Y';
-		if (strchr(line, 'Z'))
-			axis[0] = 'Z';
-		sprintf(http_command, "script=G28%s", axis);
-		if (axis[0])
-		{
-			strcat(http_command, "%20");
-			strcat(http_command, axis);
-		}
-		if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
-			return EXIT_FAILURE;
+		char axis[5] = {'%', '2', '0', 'A', '\0'};
+		axis[3] = line[4];
+		if (axis[3] == 'C')
+			axis[0] = '\0';
+		sprintf(http_command, "script=G28%s",axis);
+		DEBUG_LOG("URL: %s%s%s\n",host,"/printer/gcode/script",http_command);
+	// 	if (curl_execute("/printer/gcode/script", http_command, &strbuf, CURL_POST) == NULL)
+	// 		return EXIT_FAILURE;
 	}
 	else if (!strncmp(line, "A22", 3))
 	{
