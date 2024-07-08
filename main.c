@@ -62,20 +62,24 @@ string_buffer_t strbuf;
 jsmntok_arr_t files;
 
 static void
-string_buffer_initialize(string_buffer_t *sb)
-{
-	sb->len = 0;
-	sb->ptr = malloc(sb->len + 1);
-	sb->ptr[0] = '\0';
-}
-
-static void
 string_buffer_finish(string_buffer_t *sb)
 {
 	free(sb->ptr);
 	sb->len = 0;
 	sb->ptr = NULL;
 }
+
+static void
+string_buffer_initialize(string_buffer_t *sb)
+{
+	if (sb->len)
+		string_buffer_finish(sb);
+	sb->len = 0;
+	sb->ptr = malloc(sb->len + 1);
+	sb->ptr[0] = '\0';
+}
+
+
 
 static size_t
 string_buffer_callback(void *buf, size_t size, size_t nmemb, void *data)
@@ -109,7 +113,6 @@ printer_t printer;
 
 int msleep(long msec);
 int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_address);
-// jsmntok_t getFileNameByNum(jsmntok_arr_t *fileLst, int fileNum);
 jsmntok_t * getFileNameBySmallLeters(jsmntok_arr_t *fileList, const char *small_letters_name);
 char *curl_POST(char *address, char *command, string_buffer_t *strbuf);
 char *curl_GET(char *address, char *command, string_buffer_t *strbuf);
@@ -252,7 +255,7 @@ int main(int argc, char *argv[])
 		if (clock() - http_time > 0.5 && bytes_read >= 0)
 		{
 			http_time = clock();
-			char *json = curl_execute(status_querry_address, status_querry_command, &strbuf, CURL_GET);
+			char *json = curl_GET(status_querry_address, status_querry_command, &strbuf);
 			if (json == NULL)
 				return EXIT_FAILURE;
 
@@ -269,7 +272,6 @@ int main(int argc, char *argv[])
 			GetBedTargetTemperature(json, &printer);
 			//*** JSON PARSER END ***//
 
-			string_buffer_finish(&strbuf);
 			//*** HTTP REQUEST END ***//
 		}
 	}
@@ -340,7 +342,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			UART_Print("FN \r\n");
 			for (int i = filenum; i < (filenum+4) && i < files.len; i++)
 			{
-				UART_Print("%.*s\r\n", min(files.f[i].name->size,29), files.filesRespond.ptr+files.f[i].name->start);
+				UART_Print("%d\r\n", i);
 				UART_Print("%.*s\r\n",  min(files.f[i].name->size,22), files.filesRespond.ptr+files.f[i].name->start);
 			}
 			UART_Print("END\r\n");
@@ -359,7 +361,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else if (!strncmp(line, "A11", 3))
 	{
-		// sprintf(http_command, "/printer/gcode/script?script=STOP");
 		if (curl_POST("/printer/gcode/script", "script=STOP", &strbuf) == NULL){
 			return EXIT_FAILURE;
 		}
@@ -373,21 +374,11 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A13", 3))
 	{
 		char *str = line+4;
-		int i = 0;
-		while (*str != '\r'){
-			selectedFile[i++] = *str++;
-		}
-		selectedFile[i] = '\0';
-		printf("Selected: %s\n", selectedFile);
-		jsmntok_t *real_name = getFileNameBySmallLeters(&files,selectedFile);
-		if (real_name == NULL)
-		{
-			DEBUG_LOG("Filename \"%s\" not found\n", selectedFile);
-			return 0;
-		}
-		printf("Real Name: %.*s\n", real_name->size , files.filesRespond.ptr + real_name->start);
-		sprintf(selectedFile,"%.*s",real_name->size , files.filesRespond.ptr + real_name->start);
-		makeURLFileName(real_name, UrlFileName);
+		int fileNum = 0;
+		sscanf(str,"%d\r",&fileNum);
+		DEBUG_LOG("Selected file: #%4d %.*s\n", fileNum, files.f[fileNum].name->size , files.filesRespond.ptr + files.f[fileNum].name->start);
+		sprintf(selectedFile,"%.*s", files.f[fileNum].name->size , files.filesRespond.ptr + files.f[fileNum].name->start);
+		makeURLFileName(files.f[fileNum].name, UrlFileName);
 		sprintf(http_command, "filename=%s", UrlFileName);
 		DEBUG_LOG("request: %s\n", http_command);
 		if (curl_GET("/server/files/metadata", http_command, &strbuf) == NULL)
@@ -400,7 +391,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	else if (!strncmp(line, "A14", 3))
 	{
 		DEBUG_LOG("Start printing file: \"%s\"\n",selectedFile);
-		sprintf(http_command, "filename=%s",selectedFile);
+		sprintf(http_command, "filename=%s",UrlFileName);
 		if (curl_POST("/printer/print/start", http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
 		UART_Print("J04\r\n");
@@ -591,7 +582,6 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 
 #endif
-	string_buffer_finish(&strbuf);
 	return EXIT_SUCCESS;
 }
 
@@ -616,7 +606,7 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 {
 	//*** HTTP REQUEST START ***//
 	string_buffer_initialize(strbuf);
-	char *url = malloc(strlen(host) + strlen(address) + strlen(command) + 1);
+	char *url = malloc(strlen(host) + strlen(address) + strlen(command) + 2);
 	strcpy(url, host);
 	strcat(url, address);
 	if (request_type == CURL_GET)
@@ -666,36 +656,6 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 	return (char *)strbuf->ptr;
 }
 
-// jsmntok_t getFileNameByNum(jsmntok_arr_t *fileLst, int fileNum)
-// {
-// 	int i = 0;
-// 	while (i <= fileNum)
-// 	{
-// 		fileList = strstr(fileList, "path");
-// 		if (fileList == NULL)
-// 			return NULL;
-// 		while (*fileList++ != '\"')
-// 				;
-// 		while (*fileList++ != '\"')
-// 			;
-// 		int j = 0;
-// 		while (*fileList != '\"')
-// 		{
-// 			if (*fileList == '/' || j >= 30){
-// 				j = 0;
-// 				break;
-// 			}else{
-// 				buf[j++] = *fileList++;
-// 			}
-// 		}
-// 		if (j >0 ){
-// 			i++;
-// 		}
-// 		buf[j] = '\0';
-// 	}
-// 	return (&buf[0]);
-// }
-
 jsmntok_t *getFileNameBySmallLeters(jsmntok_arr_t *fileLst, const char *small_letters_name)
 {
 	size_t pos = 0;
@@ -704,15 +664,14 @@ jsmntok_t *getFileNameBySmallLeters(jsmntok_arr_t *fileLst, const char *small_le
 		return NULL;
 	while (pos<fileLst->len)
 	{
-		// char *normalName = fileLst->filesRespond.ptr + (*fileLst).f[pos].name->start;
-		//char *smallName = small_letters_name;
 		char *normalName = malloc((*fileLst).f[pos].name->size + 1);
+		memset(normalName,'\0',(*fileLst).f[pos].name->size + 1);
 		strncpy(normalName, (fileLst->filesRespond.ptr + (*fileLst).f[pos].name->start),(*fileLst).f[pos].name->size);
 		for (char *p = normalName; *p; p++)
 		{
 			*p=tolower(*p);
 		}
-		if (!strncmp(normalName,small_letters_name,(*fileLst).f[pos].name->size))
+		if (!strncmp(normalName,small_letters_name,strlen(small_letters_name)))
 		{
 			free(normalName);
 			return (*fileLst).f[pos].name;
@@ -725,7 +684,7 @@ jsmntok_t *getFileNameBySmallLeters(jsmntok_arr_t *fileLst, const char *small_le
 
 static int getFileListFromServer(void)
 {
-		if (curl_execute("/server/files/list","", &files.filesRespond, CURL_GET) == NULL)
+		if (curl_GET("/server/files/list","", &files.filesRespond) == NULL)
 		{
 			UART_Print("J02\r\n");
 			return EXIT_FAILURE;
