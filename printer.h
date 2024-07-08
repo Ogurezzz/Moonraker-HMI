@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #define JSMN_HEADER
-#include "jsmn/jsmn.h"
+#include "jsmn.h"
 typedef struct
 {
 	float extruder_temp;

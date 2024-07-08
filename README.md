@@ -9,14 +9,14 @@ sudo apt install libcurl4-openssl-dev
 Clone and compile:
 ```
 cd ~
-git clone --recurse-submodules https://github.com/Ogurezzz/Moonraker-HMI.git
+git clone https://github.com/Ogurezzz/Moonraker-HMI.git
 cd Moonraker-HMI
 make
 ```
 Update:
 ```
 cd ~/Moonraker-HMI
-git submodule update --init --recursive
+git pull
 make
 ```
 Make binary executable:
