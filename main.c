@@ -6,7 +6,6 @@ char read_buf[256];
 char usart_tx_buf[256];
 char post_req[256];
 char FileName[256];
-char UrlFileName[256];
 char selectedFile[256];
 int serial_port;
 char *get_req;
@@ -116,7 +115,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 jsmntok_t * getFileNameBySmallLeters(jsmntok_arr_t *fileList, const char *small_letters_name);
 char *curl_POST(char *address, char *command, string_buffer_t *strbuf);
 char *curl_GET(char *address, char *command, string_buffer_t *strbuf);
-void makeURLFileName(jsmntok_t *filename_tok, char *UrlFileName);
+char* urlEncode(const char* string, size_t len);
 char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_TYPE request_type);
 static int getFileListFromServer(void);
 int compare_files  (const void* a, const void* b);
@@ -378,8 +377,8 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		sscanf(str,"%d\r",&fileNum);
 		DEBUG_LOG("Selected file: #%4d %.*s\n", fileNum, files.f[fileNum].name->size , files.filesRespond.ptr + files.f[fileNum].name->start);
 		sprintf(selectedFile,"%.*s", files.f[fileNum].name->size , files.filesRespond.ptr + files.f[fileNum].name->start);
-		makeURLFileName(files.f[fileNum].name, UrlFileName);
-		sprintf(http_command, "filename=%s", UrlFileName);
+		char *urlfilename = urlEncode((const char*) files.filesRespond.ptr + files.f[fileNum].name->start, files.f[fileNum].name->size);
+		sprintf(http_command, "filename=%s", urlfilename);
 		DEBUG_LOG("request: %s\n", http_command);
 		if (curl_GET("/server/files/metadata", http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
@@ -387,14 +386,18 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			UART_Print("J20\r\n");
 		else
 			UART_Print("J21\r\n");
+		free(urlfilename);
 	}
 	else if (!strncmp(line, "A14", 3))
 	{
 		DEBUG_LOG("Start printing file: \"%s\"\n",selectedFile);
-		sprintf(http_command, "filename=%s",UrlFileName);
+		char *urlfilename = urlEncode(selectedFile, strlen(selectedFile));
+
+		sprintf(http_command, "filename=%s",urlfilename);
 		if (curl_POST("/printer/print/start", http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
 		UART_Print("J04\r\n");
+		free(urlfilename);
 	}
 
 	else if (!strncmp(line, "A16", 3))
@@ -761,30 +764,27 @@ int compare_files  (const void* a, const void* b)
 }
 
 
-void makeURLFileName(jsmntok_t *filename_tok, char *UrlFileName)
-{
-	char *fileNamePtr =  files.filesRespond.ptr + filename_tok->start;
-	for (size_t i = 0; i < filename_tok->size; i++)
-	{
-		switch (*fileNamePtr)
-		{
-		case ' ':
-			*UrlFileName++ = '%';
-			*UrlFileName++ = '2';
-			*UrlFileName++ = '0';
-			break;
-		case '+':
-			*UrlFileName++ = '%';
-			*UrlFileName++ = '2';
-			*UrlFileName++ = 'B';
-		break;
-		default:
-			*UrlFileName++ = *fileNamePtr;
-			break;
-		}
-		fileNamePtr++;
-	}
-	*UrlFileName = '\0';
+char* urlEncode(const char* string, size_t len) {
+    const char* hexChars = "0123456789ABCDEF";
+    size_t length = len;
+    char* encodedString = malloc(3 * length + 1); // Allocate memory for the encoded string
+    size_t index = 0;
 
+    for (size_t i = 0; i < length; i++) {
+        char currentChar = string[i];
 
+        if (isalnum(currentChar) || currentChar == '-' || currentChar == '_' || currentChar == '.') {
+            encodedString[index++] = currentChar; // Append alphanumeric and safe characters as is
+        } else if (currentChar == ' ') {
+            encodedString[index++] = '+'; // Convert space to '+'
+        } else {
+            encodedString[index++] = '%'; // Convert other characters to percent-encoding
+            encodedString[index++] = hexChars[(currentChar >> 4) & 0xF]; // Append first hexadecimal digit
+            encodedString[index++] = hexChars[currentChar & 0xF]; // Append second hexadecimal digit
+        }
+    }
+
+    encodedString[index] = '\0'; // Add null terminator
+
+    return encodedString;
 }
