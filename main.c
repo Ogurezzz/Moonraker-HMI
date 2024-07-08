@@ -6,6 +6,7 @@ char read_buf[256];
 char usart_tx_buf[256];
 char post_req[256];
 char FileName[256];
+char UrlFileName[256];
 char selectedFile[256];
 int serial_port;
 char *get_req;
@@ -108,9 +109,11 @@ printer_t printer;
 
 int msleep(long msec);
 int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_address);
-char *getFileNameByNum(char *fileList, int fileNum, char buf[]);
+// jsmntok_t getFileNameByNum(jsmntok_arr_t *fileLst, int fileNum);
 jsmntok_t * getFileNameBySmallLeters(jsmntok_arr_t *fileList, const char *small_letters_name);
 char *curl_POST(char *address, char *command, string_buffer_t *strbuf);
+char *curl_GET(char *address, char *command, string_buffer_t *strbuf);
+void makeURLFileName(jsmntok_t *filename_tok, char *UrlFileName);
 char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_TYPE request_type);
 static int getFileListFromServer(void);
 int compare_files  (const void* a, const void* b);
@@ -138,7 +141,7 @@ int main(int argc, char *argv[])
 
 	host = argv[1];
 	char *status_querry_address = "/printer/objects/query";
-	char *status_querry_command = "?extruder=temperature,target&heater_bed=temperature,target&fan=speed&gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&filament_switch_sensor%20Runout_Sensor=filament_detected";
+	char *status_querry_command = "extruder=temperature,target&heater_bed=temperature,target&fan=speed&gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&filament_switch_sensor%20Runout_Sensor=filament_detected";
 
 	//*** CURL INIT END ***//
 
@@ -384,11 +387,12 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 		}
 		printf("Real Name: %.*s\n", real_name->size , files.filesRespond.ptr + real_name->start);
 		sprintf(selectedFile,"%.*s",real_name->size , files.filesRespond.ptr + real_name->start);
-		sprintf(http_command, "filename=%s", selectedFile);
+		makeURLFileName(real_name, UrlFileName);
+		sprintf(http_command, "filename=%s", UrlFileName);
 		DEBUG_LOG("request: %s\n", http_command);
-		if (curl_POST("/server/files/metadata", http_command, &strbuf) == NULL)
+		if (curl_GET("/server/files/metadata", http_command, &strbuf) == NULL)
 			return EXIT_FAILURE;
-		if (strstr(strbuf.ptr,"\"code\": 404") == NULL)
+		if (strstr(strbuf.ptr,"HTTP/1.1 200 OK"))
 			UART_Print("J20\r\n");
 		else
 			UART_Print("J21\r\n");
@@ -597,8 +601,15 @@ char *curl_POST(char *address, char *command, string_buffer_t *strbuf)
 	DEBUG_LOG("POST: %s%s%s\n", host, address, command);
 	return "ok";
 #else
+	DEBUG_LOG("POST: %s%s%s\n", host, address, command);
 	return curl_execute(address, command, strbuf, CURL_POST);
 #endif
+}
+
+char *curl_GET(char *address, char *command, string_buffer_t *strbuf)
+{
+	DEBUG_LOG("GET: %s%s?%s\n", host, address, command);
+	return curl_execute(address, command, strbuf, CURL_GET);
 }
 
 char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_TYPE request_type)
@@ -609,7 +620,10 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 	strcpy(url, host);
 	strcat(url, address);
 	if (request_type == CURL_GET)
+	{
+		strcat(url, "?");
 		strcat(url, command);
+	}
 	CURL *curl;
 	CURLcode res;
 	curl = curl_easy_init();
@@ -652,35 +666,35 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 	return (char *)strbuf->ptr;
 }
 
-char *getFileNameByNum(char *fileList, int fileNum, char buf[])
-{
-	int i = 0;
-	while (i <= fileNum)
-	{
-		fileList = strstr(fileList, "path");
-		if (fileList == NULL)
-			return NULL;
-		while (*fileList++ != '\"')
-				;
-		while (*fileList++ != '\"')
-			;
-		int j = 0;
-		while (*fileList != '\"')
-		{
-			if (*fileList == '/' || j >= 30){
-				j = 0;
-				break;
-			}else{
-				buf[j++] = *fileList++;
-			}
-		}
-		if (j >0 ){
-			i++;
-		}
-		buf[j] = '\0';
-	}
-	return (&buf[0]);
-}
+// jsmntok_t getFileNameByNum(jsmntok_arr_t *fileLst, int fileNum)
+// {
+// 	int i = 0;
+// 	while (i <= fileNum)
+// 	{
+// 		fileList = strstr(fileList, "path");
+// 		if (fileList == NULL)
+// 			return NULL;
+// 		while (*fileList++ != '\"')
+// 				;
+// 		while (*fileList++ != '\"')
+// 			;
+// 		int j = 0;
+// 		while (*fileList != '\"')
+// 		{
+// 			if (*fileList == '/' || j >= 30){
+// 				j = 0;
+// 				break;
+// 			}else{
+// 				buf[j++] = *fileList++;
+// 			}
+// 		}
+// 		if (j >0 ){
+// 			i++;
+// 		}
+// 		buf[j] = '\0';
+// 	}
+// 	return (&buf[0]);
+// }
 
 jsmntok_t *getFileNameBySmallLeters(jsmntok_arr_t *fileLst, const char *small_letters_name)
 {
@@ -785,4 +799,33 @@ static int getFileListFromServer(void)
 int compare_files  (const void* a, const void* b)
 {
     return (((file_t*)b)->modified - ((file_t*)a)->modified);
+}
+
+
+void makeURLFileName(jsmntok_t *filename_tok, char *UrlFileName)
+{
+	char *fileNamePtr =  files.filesRespond.ptr + filename_tok->start;
+	for (size_t i = 0; i < filename_tok->size; i++)
+	{
+		switch (*fileNamePtr)
+		{
+		case ' ':
+			*UrlFileName++ = '%';
+			*UrlFileName++ = '2';
+			*UrlFileName++ = '0';
+			break;
+		case '+':
+			*UrlFileName++ = '%';
+			*UrlFileName++ = '2';
+			*UrlFileName++ = 'B';
+		break;
+		default:
+			*UrlFileName++ = *fileNamePtr;
+			break;
+		}
+		fileNamePtr++;
+	}
+	*UrlFileName = '\0';
+
+
 }
