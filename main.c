@@ -2,6 +2,7 @@
 #include "main.h"
 
 // Allocate memory for read buffer, set size according to your needs
+char *config_path;
 char read_buf[256];
 char usart_tx_buf[256];
 char post_req[256];
@@ -10,7 +11,32 @@ char selectedFile[256];
 int serial_port;
 char *get_req;
 char *fileList;
-char *host;
+
+// Configuration parameters
+#define DEFAULT_CONFIG_PATH "/etc/moonraker-hmi/moonraker-hmi.cfg"
+char host[1024];
+char serial[1024];
+char log_path[1024];
+
+
+
+
+#define LOG_ERR(fmt, ...)	\
+	fprintf(stderr, "[ERROR] <%s:%d> : " fmt "\n", __FUNCTION__, __LINE__, __VA_ARGS__)
+
+#define LOG_INFO(fmt, ...)	\
+	fprintf(stderr, "[INFO] : " fmt "\n", __VA_ARGS__)
+
+
+#define CONFIGREADFILE		"../etc/config.cnf"
+#define CONFIGSAVEFILE		"../etc/new-config.cnf"
+
+#define ENTER_TEST_FUNC														\
+	do {																	\
+		LOG_INFO("%s", "\n-----------------------------------------------");\
+		LOG_INFO("<TEST: %s>\n", __FUNCTION__);								\
+	} while (0)
+
 
 jsmn_parser p;
 jsmntok_t *filesList = NULL;
@@ -129,6 +155,20 @@ int main(int argc, char *argv[])
 {
 	clock_t http_time;
 
+	//*** Read configuration file ***//
+	Config *cfg = NULL;
+	char *config_path = DEFAULT_CONFIG_PATH;
+	if (argv[1] != NULL)
+		config_path = argv[1];
+
+	if (ConfigReadFile(config_path, &cfg) != CONFIG_OK) {
+		LOG_ERR("ConfigOpenFile failed for %s", config_path);
+		return 1;
+	}
+	ConfigReadString(cfg,"connection","hots", host, sizeof(host), "http://127.0.0.1:7125");
+	ConfigReadString(cfg,"connection","log_path", log_path, sizeof(log_path), "/var/log/moonraker-hmi.log");
+	ConfigReadString(cfg,"connection","serial", serial, sizeof(serial), "");
+
 	//*** jasmine init ***//
 	  jsmn_init(&p);
 
@@ -141,16 +181,14 @@ int main(int argc, char *argv[])
 
 	//*** CURL INIT START ***//
 
-	host = argv[1];
 	char *status_querry_address = "/printer/objects/query";
 	char *status_querry_command = "extruder=temperature,target&heater_bed=temperature,target&fan=speed&gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&filament_switch_sensor%20Runout_Sensor=filament_detected";
 
 	//*** CURL INIT END ***//
 
 	//*** SERIAL INIT START ***//
-	char *portPath = argv[2];
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
-	serial_port = open(portPath, O_RDWR);
+	serial_port = open(serial, O_RDWR);
 
 	// Create new termios struct, we call it 'tty' for convention
 	struct termios tty;
