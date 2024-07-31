@@ -3,6 +3,7 @@
 // C library headers
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
@@ -13,7 +14,8 @@
 // Additional Libs
 #include <curl/curl.h>
 #define JSMN_HEADER
-#include "jsmn.h"
+#include "libs/jsmn.h"
+#include "libs/configini.h"
 
 // Linux headers
 #include <fcntl.h> // Contains file controls like O_RDWR
