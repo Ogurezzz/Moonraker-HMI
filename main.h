@@ -13,7 +13,7 @@
 // Additional Libs
 #include <curl/curl.h>
 #define JSMN_HEADER
-#include "jsmn.h"
+#include "libs/jsmn.h"
 
 // Linux headers
 #include <fcntl.h> // Contains file controls like O_RDWR

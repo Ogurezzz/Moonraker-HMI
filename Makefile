@@ -22,8 +22,8 @@ main.o: main.c
 printer.o: printer.c
 	$(CC) $(CFLAGS) -c printer.c -o $(OBJPATH)/printer.o
 
-jsmn.o: jsmn.c
-	$(CC) $(CFLAGS) -c jsmn.c -o $(OBJPATH)/jsmn.o
+jsmn.o: libs/jsmn.c
+	$(CC) $(CFLAGS) -c libs/jsmn.c -o $(OBJPATH)/jsmn.o
 
 clean:
 	rm -rf *.o $(OBJPATH) $(BINPATH)
