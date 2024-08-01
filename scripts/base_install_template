@@ -1,0 +1,3 @@
+[connection]
+hots: http://localhost:7125
+serial: /dev/null
