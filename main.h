@@ -26,9 +26,10 @@
 
 #include "printer.h"
 
+#define VERSION "0.0.1"
+
 #define UART_Print(...)		do {	char _buf[1024]; 			\
 								sprintf(_buf, __VA_ARGS__); 	\
-								printf("Sent: %s",_buf);		\
 								int r __attribute__((unused)); \
 								r = write(serial_port, _buf, strlen(_buf));} while(0)
 

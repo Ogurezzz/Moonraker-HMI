@@ -16,7 +16,6 @@ char *fileList;
 #define DEFAULT_CONFIG_PATH "/etc/moonraker-hmi/moonraker-hmi.cfg"
 char host[1024];
 char serial[1024];
-char log_path[1024];
 
 
 
@@ -158,16 +157,35 @@ int main(int argc, char *argv[])
 	//*** Read configuration file ***//
 	Config *cfg = NULL;
 	char *config_path = DEFAULT_CONFIG_PATH;
-	if (argv[1] != NULL)
-		config_path = argv[1];
 
-	if (ConfigReadFile(config_path, &cfg) != CONFIG_OK) {
+	LOG_INFO("Moonraker-HMI service v%s starting...",VERSION);
+	if (argv[2] != NULL)
+	{
+		LOG_ERR("Too many arguments.%s","");
+		exit (EXIT_FAILURE);
+	}
+
+	if (argv[1] != NULL)
+	{
+		config_path = argv[1];
+	}
+	else
+	{
+		LOG_ERR ("No config file set. Abort...%s","");
+		exit (EXIT_FAILURE);
+	}
+
+	if (ConfigReadFile(config_path, &cfg) != CONFIG_OK)
+	{
 		LOG_ERR("ConfigOpenFile failed for %s", config_path);
-		return 1;
+		exit (EXIT_FAILURE);
 	}
 	ConfigReadString(cfg,"connection","hots", host, sizeof(host), "http://127.0.0.1:7125");
-	ConfigReadString(cfg,"connection","log_path", log_path, sizeof(log_path), "/var/log/moonraker-hmi.log");
 	ConfigReadString(cfg,"connection","serial", serial, sizeof(serial), "");
+
+
+	LOG_INFO("host: %s", host);
+	LOG_INFO("serial: %s", serial);
 
 	//*** jasmine init ***//
 	  jsmn_init(&p);
@@ -175,8 +193,8 @@ int main(int argc, char *argv[])
 	/* Allocate some tokens as a start */
 	filesList = malloc(sizeof(*filesList) * filesBufSize);
 	if (filesList == NULL) {
-		fprintf(stderr, "malloc(): errno=%d\n", errno);
-		return 3;
+		LOG_ERR("malloc(): errno=%d\n", errno);
+		exit (EXIT_FAILURE);;
 	}
 
 	//*** CURL INIT START ***//
@@ -196,8 +214,8 @@ int main(int argc, char *argv[])
 	// Read in existing settings, and handle any error
 	if (tcgetattr(serial_port, &tty) != 0)
 	{
-		printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
-		return 1;
+		LOG_ERR("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+		exit (EXIT_FAILURE);
 	}
 
 	tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
@@ -237,8 +255,8 @@ int main(int argc, char *argv[])
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
 	{
-		printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
-		return 1;
+		LOG_ERR("Error %i from tcsetattr: %s\n", errno, strerror(errno));
+		exit (EXIT_FAILURE);;
 	}
 
 	//*** SERIAL INIT END ***//
@@ -247,9 +265,10 @@ int main(int argc, char *argv[])
 #endif
 	http_time = clock();
 	if (getFileListFromServer())
-		return EXIT_FAILURE;
+		exit (EXIT_FAILURE);;
 
-
+LOG_INFO("Moonraker-HMI service v%s started", VERSION
+);
 	while (1)
 	{
 		// Read bytes. The behaviour of read() (e.g. does it block?,
@@ -259,7 +278,7 @@ int main(int argc, char *argv[])
 		int bytes_read = read(serial_port, &read_buf, sizeof(read_buf));
 		if (bytes_read < 0)
 		{
-			printf("Error reading: %s\n", strerror(errno));
+			LOG_ERR("Error reading: %s\n", strerror(errno));
 		}
 		else
 		{
@@ -279,8 +298,6 @@ int main(int argc, char *argv[])
 				}
 				else if(st[index] == '\0'){
 					UART_Print("ok\r\n");
-					//write(serial_port, "ok\r\n", strlen("ok\r\n"));
-					printf ("Got Zero\n");
 				}
 				else
 				{
@@ -324,7 +341,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	memset(&post_req, '\0', sizeof(post_req));
 	usart_tx_buf[0] = '\0';
 	http_command[0] = '\0';
-	printf("Get: %s\n",line);
+	DEBUG_LOG("Get: %s\n",line);
 	if (strnlen(line, (size_t) 256) == (size_t) 256)
 	{
 		return EXIT_FAILURE;
@@ -542,7 +559,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 	}
 	else
 		{
-		printf("Unknown request: %s\n", line);
+		LOG_ERR("Unknown request: %s\n", line);
 	}
 #endif
 #ifdef MKS_TFT35

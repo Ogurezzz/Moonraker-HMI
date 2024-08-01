@@ -1,7 +1,6 @@
 CC=gcc
 
-CFLAGS=-Og -ggdb -Wall -fdiagnostics-color=always -DDEBUG
-
+CFLAGS=-Og -ggdb -Wall -fdiagnostics-color=always
 OBJPATH=obj
 
 BINPATH=bin
@@ -13,7 +12,6 @@ moonraker-hmi: main.o printer.o jsmn.o configini.o
 	$(CC) $(CFLAGS) $(OBJPATH)/main.o $(OBJPATH)/printer.o $(OBJPATH)/jsmn.o $(OBJPATH)/configini.o -o $(BINPATH)/moonraker-hmi -lcurl
 
 main.o: main.c
-	clear
 	mkdir -p $(OBJPATH)
 	$(CC) $(CFLAGS) -c main.c -o $(OBJPATH)/main.o
 
