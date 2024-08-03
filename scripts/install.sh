@@ -1,12 +1,12 @@
 #!/bin/bash
 # This script installs Moonraker HMI service
 # Great thanks to Lefskiy (https://github.com/nlef) for his moonraker-telegram-bot install script
-set -eux
+set -eu
 
 SYSTEMDDIR="/etc/systemd/system"
 MOONRAKER_HMI_SERVICE="moonraker-hmi.service"
 MOONRAKER_HMI_DIR=$(dirname $(dirname "$(realpath $0)"))
-MOONRAKER_HMI_LOG="${HOME}/printer_data/logs/hmi.log"
+MOONRAKER_HMI_LOG="${HOME}/printer_data/logs"
 MOONRAKER_HMI_LOG_DEFAULT="${HOME}/.config/moonraker-hmi"
 MOONRAKER_HMI_CONF="${HOME}/printer_data/config"
 MOONRAKER_HMI_CONF_DEFAULT="${HOME}/.config/moonraker-hmi"
@@ -65,7 +65,7 @@ create_initial_config() {
       mkdir -p ${MOONRAKER_HMI_CONF}
       cp -n "${MOONRAKER_HMI_DIR}"/scripts/base_install_template "${MOONRAKER_HMI_CONF}"/hmi.conf
     fi
-
+    MOONRAKER_HMI_LOG=$KLIPPER_LOGS_DIR/hmi.log
     create_service
     ok_msg "Single Moonraker HMI service installed!"
 
