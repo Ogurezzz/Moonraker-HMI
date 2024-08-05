@@ -30,3 +30,6 @@ To run it, just connect your old LCD to local machine with USB-UART converter an
 ./bin/moonraker-hmi http://192.168.5.10:7125 /dev/ttyUSB0
 ```
 Also you can add this binary to PATH and set autostart.
+
+---
+Great thanks to [DrPerryCoke](https://github.com/DrPerryCoke) for Case model.
