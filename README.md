@@ -56,7 +56,7 @@ Config file example:
 hots: http://192.168.5.12:7125
 #Your printer's address
 serial: /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
-#Serial port that appeared on the machine you connect LCT to.
+#Serial port that appeared on the machine you connect LCD to.
 ```
 
 Case
