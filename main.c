@@ -51,7 +51,7 @@ static inline void *realloc_it(void *ptrmem, size_t size) {
   void *p = realloc(ptrmem, size);
   if (!p) {
     free(ptrmem);
-    fprintf(stderr, "realloc(): errno=%d\n", errno);
+    LOG_ERR("realloc(): errno=%d\n", errno);
   }
   return p;
 }
@@ -616,11 +616,11 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 					char *errMsg = result;
 					while (*result++ != '\'')
 					{
-						//fprintf(stderr,"%c",*result++);
+						// LOG_ERR("%c",*result++);
 					}
 					*result = '\0';
 					UART_Print("!! %s\r\nok\r\n",errMsg);
-					//fprintf(stderr,"%s\r\n",errMsg);
+					// LOG_ERR("%s\r\n",errMsg);
 				}
 			}
 		}
@@ -634,7 +634,7 @@ int line_process(char *line, char *usart_tx_buf, char *http_command, char *http_
 			usart_tx_buf[i++]='\n';
 			usart_tx_buf[i]='\0';
 				UART_Print( "%s", usart_tx_buf);
-				//fprintf(stdout, "Push: %s", usart_tx_buf);
+				// LOG_INFO("Push: %s", usart_tx_buf);
 				//write(serial_port, usart_tx_buf, strlen(usart_tx_buf));
 		}
 	}
@@ -678,7 +678,7 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 
 	if (!curl)
 	{
-		fprintf(stderr, "Fatal: curl_easy_init() error.\n");
+		LOG_ERR("curl_easy_init() error","");
 		string_buffer_finish(strbuf);
 		free(url);
 		return NULL;
@@ -695,14 +695,14 @@ char *curl_execute(char *address, char *command, string_buffer_t *strbuf, CURL_T
 	res = curl_easy_perform(curl);
 	while (res == CURLE_COULDNT_CONNECT)
 	{
-		fprintf(stderr, "Request failed: curl_easy_perform(): %s\n", curl_easy_strerror(res));
+		LOG_ERR("Request failed: curl_easy_perform(): %s\n", curl_easy_strerror(res));
 		sleep(1);
 		res = curl_easy_perform(curl);
 	}
 
 	if (res != CURLE_OK)
 	{
-		fprintf(stderr, "Request failed: curl_easy_perform(): %s\n", curl_easy_strerror(res));
+		LOG_ERR("Request failed: curl_easy_perform(): %s\n", curl_easy_strerror(res));
 
 		curl_easy_cleanup(curl);
 		string_buffer_finish(strbuf);
