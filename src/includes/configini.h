@@ -31,17 +31,18 @@
 #define CONFIGINI_H_
 
 #include <stdio.h>
+#include <stdbool.h>
 
 
-#ifndef __cplusplus
+// #ifndef __cplusplus
 
-typedef unsigned char bool;
-#undef  false
-#define false 	0
-#undef  true
-#define true	(!false)
+// typedef unsigned char bool;
+// #undef  false
+// #define false 	0
+// #undef  true
+// #define true	(!false)
 
-#endif
+// #endif
 
 
 typedef struct Config Config;
