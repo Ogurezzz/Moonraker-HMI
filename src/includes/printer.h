@@ -50,6 +50,10 @@ typedef struct
 	{
 		char host[HOST_NAME_MAX];
 		char serial[PATH_MAX];
+		int	 PLA_E;
+		int	 PLA_B;
+		int	 ABS_E;
+		int	 ABS_B;
 	} cfg;
 
 } printer_t;

@@ -77,6 +77,10 @@ main(int argc, char *argv[])
 					 sizeof(my_printer.cfg.host), "http://127.0.0.1:7125");
 	ConfigReadString(cfg, "connection", "serial", my_printer.cfg.serial,
 					 sizeof(my_printer.cfg.serial), "");
+	ConfigReadInt(cfg, "preheat", "pla_hotend", &my_printer.cfg.PLA_E, 220);
+	ConfigReadInt(cfg, "preheat", "pla_heatbed", &my_printer.cfg.PLA_B, 60);
+	ConfigReadInt(cfg, "preheat", "abs_hotend", &my_printer.cfg.ABS_E, 240);
+	ConfigReadInt(cfg, "preheat", "abs_heatbed", &my_printer.cfg.ABS_B, 100);
 
 	LOG_INFO("host: %s", my_printer.cfg.host);
 	LOG_INFO("serial: %s", my_printer.cfg.serial);
