@@ -224,15 +224,17 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				break;
 			case 23: /* Preheat PLA */
 				sprintf(http_command,
-						"script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=230%%0A"
-						"SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=80");
+						"script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d%%0A"
+						"SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=%d",
+						printer->cfg.PLA_E, printer->cfg.PLA_B);
 				if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
 					LOG_ERR("%s", "Extruder preheat error");
 				break;
 			case 24: /* Preheat ABS */
 				sprintf(http_command,
-						"script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=245%%0A"
-						"SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=100");
+						"script=SET_HEATER_TEMPERATURE%%20HEATER=extruder%%20TARGET=%d%%0A"
+						"SET_HEATER_TEMPERATURE%%20HEATER=heater_bed%%20TARGET=%d",
+						printer->cfg.ABS_E, printer->cfg.ABS_B);
 				if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
 					LOG_ERR("%s", "Extruder preheat error");
 				break;
