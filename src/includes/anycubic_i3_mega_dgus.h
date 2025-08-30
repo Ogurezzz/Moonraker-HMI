@@ -1,0 +1,37 @@
+#ifndef _ANYCUBIC_I3_MEGA_GDUS
+#define _ANYCUBIC_I3_MEGA_GDUS
+#define JSMN_HEADER
+// #include "printer.h"
+#include "main.h"
+
+#define RESPOND_BUF_SIZE 1024
+int react(printer_t *printer, char *command, string_buffer_t *uart_respond);
+
+typedef enum reactions_uart_respond
+{
+	SD_CARD_INSERTED,
+	SD_CARD_REMOVED,
+	NO_SD_CARD,
+	USB_ONLINE,
+	PRINT_FROM_SD,
+	PAUSE_SENT,
+	NOZZLE_HEATING,
+	NOZZLE_HEATING_DONE,
+	BED_HEATING,
+	BED_HEATING_DONE,
+	T0_SENSOR_ABNORMAL,
+	UNKNOWN,
+	READY,
+	LOW_E0_TEMPERATURE,
+	PRINTING_DONE,
+	FILAMENT_RUNOUT_DETECTED,
+	STOP_PRINT,
+	MAINBOARD_RESET,
+	PAUSE_SUCCESS,
+	UNKNOWN2,
+	FILE_OPEN_SUCCESS,
+	FILE_OPEN_FAIL,
+	SHOW_FILAMENT_PROMT
+} reactions_uart_respond_t;
+
+#endif

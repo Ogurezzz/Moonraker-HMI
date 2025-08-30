@@ -99,6 +99,9 @@ JSMN_API void jsmn_init(jsmn_parser *parser);
 JSMN_API int jsmn_parse(jsmn_parser *parser, const char *js, const size_t len,
                         jsmntok_t *tokens, const unsigned int num_tokens);
 
+JSMN_API void *realloc_it(void *ptrmem, size_t size);
+JSMN_API int   jsoneq(const char *json, jsmntok_t *tok, const char *s);
+
 #ifndef JSMN_HEADER
 /**
  * Allocates a fresh unused token from the token pool.
@@ -196,10 +199,10 @@ static int jsmn_parse_string(jsmn_parser *parser, const char *js,
   jsmntok_t *token;
 
   int start = parser->pos;
-  
+
   /* Skip starting quote */
   parser->pos++;
-  
+
   for (; parser->pos < len && js[parser->pos] != '\0'; parser->pos++) {
     char c = js[parser->pos];
 
