@@ -23,6 +23,8 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 
 	if (cmd == 'A')
 	{
+		static bool extrude_sent = false;
+		static bool remove_sent	 = false;
 		switch (val)
 		{
 			case 0: /* Current hotend temp */
@@ -167,9 +169,12 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				} while (0);
 				break;
 			case 19: /* Turn off motors */
-				sprintf(respond, "script=M84");
-				if (curl_POST(printer->cfg.host, "/printer/gcode/script", respond, &strbuf) != NULL)
-					break;
+				sprintf(http_command, "script=M84");
+				if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
+					LOG_ERR("Motors stop error: %s", command);
+				extrude_sent = false;
+				remove_sent	 = false;
+				break;
 			case 20: /* Set printing rate speed */
 				snprintf(respond, RESPOND_BUF_SIZE, "A20V %.0f\r\n", printer->feed_rate * 100);
 				break;
@@ -179,7 +184,7 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 					char axis = '\0';
 					sscanf(command, "A21 %c", &axis);
 					sprintf(http_command, "script=G28%c", axis == 'C' ? '\0' : axis);
-					if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) != NULL)
+					if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
 						LOG_ERR("Home error: '%s'", command);
 				} while (0);
 				break;
@@ -190,9 +195,31 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 					float length = 0;
 					int	  speed	 = 0;
 					sscanf(command, "A22 %c %fF%d", &axis, &length, &speed);
-					sprintf(http_command, "script=G91%%0AG1%%20%c%f%%20F%d%%0AG90", axis, length, speed);
-					if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
-						LOG_ERR("%s", "Axis move error");
+					if (axis != 'E')
+					{
+						sprintf(http_command, "script=G91%%0AG1%%20%c%f%%20F%d%%0AG90", axis, length, speed);
+						if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
+							LOG_ERR("%s", "Axis move error");
+					}
+					else
+					{
+						if (length < 0 && !remove_sent)
+						{
+							sprintf(http_command, "script=FILAMENT_UNLOAD");
+							if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
+								LOG_ERR("Filament load error: %s", command);
+							remove_sent	 = true;
+							extrude_sent = false;
+						}
+						else if (length > 0 && !extrude_sent)
+						{
+							sprintf(http_command, "script=FILAMENT_LOAD");
+							if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
+								LOG_ERR("Filament load error: %s", command);
+							remove_sent	 = false;
+							extrude_sent = true;
+						}
+					}
 				} while (0);
 				break;
 			case 23: /* Preheat PLA */
