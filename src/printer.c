@@ -183,31 +183,55 @@ again:
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "extruder") == 0)
 			{
-				static bool notified = false;
+				static bool heat_done = false; // heat done notification sent
+				static bool heating	  = false; // heating notification sent
 				sscanf(statusRespond->ptr + t[i + 1].start, "{\"temperature\": %f, \"target\": %f}",
 					   &printer->extruder_temp, &printer->extruder_target);
 
-				if (printer->extruder_temp >= printer->extruder_target && !notified)
+				if (printer->extruder_target > 0)
 				{
-					UART_Print("J%02d\r\n", NOZZLE_HEATING_DONE);
-					notified = true;
+					if (!heating)
+					{
+						UART_Print("J%02d\r\n", NOZZLE_HEATING);
+						heating = true;
+					}
+					if (!heat_done && printer->extruder_temp >= printer->extruder_target)
+					{
+						UART_Print("J%02d\r\n", NOZZLE_HEATING_DONE);
+						heat_done = true;
+					}
 				}
-				if (notified && printer->extruder_target == 0)
-					notified = false;
+				else
+				{
+					heat_done = false;
+					heating	  = false;
+				}
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "heater_bed") == 0)
 			{
-				static bool notified = false;
+				static bool heat_done = false; // heat done notification sent
+				static bool heating	  = false; // heating notification sent
 				sscanf(statusRespond->ptr + t[i + 1].start, "{\"temperature\": %f, \"target\": %f}",
 					   &printer->heatbed_temp, &printer->heatbed_target);
 
-				if (printer->heatbed_temp >= printer->heatbed_target && !notified)
+				if (printer->heatbed_target > 0)
 				{
-					UART_Print("J%02d\r\n", BED_HEATING_DONE);
-					notified = true;
+					if (!heating)
+					{
+						UART_Print("J%02d\r\n", BED_HEATING);
+						heating = true;
+					}
+					if (!heat_done && printer->heatbed_temp >= printer->heatbed_target)
+					{
+						UART_Print("J%02d\r\n", BED_HEATING_DONE);
+						heat_done = true;
+					}
 				}
-				if (notified && printer->heatbed_target == 0)
-					notified = false;
+				else
+				{
+					heat_done = false;
+					heating	  = false;
+				}
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "filament_detected") == 0)
 			{
