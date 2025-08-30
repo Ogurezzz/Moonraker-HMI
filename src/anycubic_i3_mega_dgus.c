@@ -114,7 +114,7 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 					DEBUG_LOG("request: %s\n", http_command);
 					free(urlfilename);
 
-					if ((curl_POST(printer->cfg.host, "/server/files/metadata", http_command, &strbuf) == NULL) ||
+					if ((curl_GET(printer->cfg.host, "/server/files/metadata", http_command, &strbuf) == NULL) ||
 						!strstr(strbuf.ptr, "HTTP/1.1 200 OK"))
 						makeRespond(FILE_OPEN_FAIL);
 					else
