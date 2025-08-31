@@ -1,3 +1,17 @@
+# The connection section is must set parameters for communication between
+# LCD and moonraker
 [connection]
 hots: http://localhost:7125
+#	Your printers IP address
 serial: /dev/null
+#	Path to LCD UART device
+
+# The preheat section allows you to set custom temperatures for Menu->Tools->Preheat buttons
+[preheat]
+#pla_hotend: 220
+#	Extruder temperature to be set on Preheat PLA LCD button press
+#pla_heatbed: 60
+#	Heatbed temperature to be set on Preheat PLA LCD button press
+#abs_hotend: 240
+#	Extruder temperature to be set on Preheat ABS LCD button press
+#abs_heatbed:100
