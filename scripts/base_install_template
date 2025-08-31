@@ -1,7 +1,7 @@
 # The connection section is must set parameters for communication between
 # LCD and moonraker
 [connection]
-hots: http://localhost:7125
+host: http://localhost:7125
 #	Your printers IP address
 serial: /dev/null
 #	Path to LCD UART device

@@ -73,7 +73,7 @@ main(int argc, char *argv[])
 		LOG_ERR("ConfigOpenFile failed for %s", config_path);
 		exit(EXIT_FAILURE);
 	}
-	ConfigReadString(cfg, "connection", "hots", my_printer.cfg.host,
+	ConfigReadString(cfg, "connection", "host", my_printer.cfg.host,
 					 sizeof(my_printer.cfg.host), "http://127.0.0.1:7125");
 	ConfigReadString(cfg, "connection", "serial", my_printer.cfg.serial,
 					 sizeof(my_printer.cfg.serial), "");
