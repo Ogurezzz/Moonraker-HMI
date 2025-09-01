@@ -50,9 +50,12 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				snprintf(respond, RESPOND_BUF_SIZE, "A6V %.0f\r\n", printer->progress * 100);
 				break;
 			case 7: /* Print time */
-				snprintf(respond, RESPOND_BUF_SIZE, "A7V %dH %dM\r\n",
-						 ((int)printer->print_time) / 3600,
-						 (((int)printer->print_time) % 3600) / 60);
+				do
+				{
+					float print_time = time_calc(printer);
+					snprintf(respond, RESPOND_BUF_SIZE, "A7V %dH %dM\r\n", ((int)print_time) / 3600,
+							 (((int)print_time) % 3600) / 60);
+				} while (0);
 
 				break;
 			case 8: /* Files list select */
@@ -99,23 +102,15 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 			case 13: /* Select file */
 				do
 				{
-					int	  fileNum	  = 0;
-					char *urlfilename = NULL;
+					int fileNum = 0;
 					if (sscanf(command, "A13 %d\r", &fileNum) != 1)
 					{
 						makeRespond(FILE_OPEN_FAIL);
 						break;
 					}
-					printer->selected_file = printer->files.list[fileNum].name;
-					DEBUG_LOG("Selected file: #%4d %s\n", fileNum, printer->selected_file);
-					urlfilename = urlEncode(printer->selected_file, strlen(printer->selected_file));
-
-					sprintf(http_command, "filename=%s", urlfilename);
-					DEBUG_LOG("request: %s\n", http_command);
-					free(urlfilename);
-
-					if ((curl_GET(printer->cfg.host, "/server/files/metadata", http_command, &strbuf) == NULL) ||
-						!strstr(strbuf.ptr, "HTTP/1.1 200 OK"))
+					printer->selected_file = &printer->files.list[fileNum];
+					DEBUG_LOG("Selected file: #%4d %s\n", fileNum, printer->selected_file->name);
+					if (fillFileData(printer->selected_file, printer) < 0)
 						makeRespond(FILE_OPEN_FAIL);
 					else
 						makeRespond(FILE_OPEN_SUCCESS);
@@ -125,13 +120,30 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				do
 				{
 					char *urlfilename = NULL;
-					DEBUG_LOG("Start printing file: \"%s\"\n", printer->selected_file);
-					urlfilename = urlEncode(printer->selected_file, strlen(printer->selected_file));
-					snprintf(http_command, BUFFER_SIZE, "filename=%s", urlfilename);
-					free(urlfilename);
+					if (strcmp("printing", printer->state.ptr) == 0)
+					{
+						/* If file already in print - do noting */
+						if (printer->selected_file == printer->printing_file)
+							break;
+						/* If Printing in process and selected file is a new one - send an error */
+						if (printer->printing_file != NULL && printer->selected_file != printer->printing_file)
+						{
+							makeRespond(MAINBOARD_RESET);
+							break;
+						}
+					}
+					else
+					{
+						DEBUG_LOG("Start printing file: \"%s\"\n", printer->selected_file->name);
+						urlfilename = urlEncode(printer->selected_file->name, strlen(printer->selected_file->name));
+						snprintf(http_command, BUFFER_SIZE, "filename=%s", urlfilename);
+						free(urlfilename);
 
-					if (curl_POST(printer->cfg.host, "/printer/print/start", http_command, &strbuf) == NULL)
-						makeRespond(FILE_OPEN_FAIL);
+						if (curl_POST(printer->cfg.host, "/printer/print/start", http_command, &strbuf) == NULL)
+							makeRespond(MAINBOARD_RESET);
+						else
+							printer->printing_file = printer->selected_file;
+					}
 				} while (0);
 				break;
 			case 16: /* Set hotend temp */
