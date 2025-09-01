@@ -81,14 +81,31 @@ main(int argc, char *argv[])
 	ConfigReadInt(cfg, "preheat", "pla_heatbed", &my_printer.cfg.PLA_B, 60);
 	ConfigReadInt(cfg, "preheat", "abs_hotend", &my_printer.cfg.ABS_E, 240);
 	ConfigReadInt(cfg, "preheat", "abs_heatbed", &my_printer.cfg.ABS_B, 100);
+	do
+	{
+		char time_option[32];
+		ConfigReadString(cfg, "time", "time_stat", time_option, sizeof(time_option), "print-time");
+		if (strcmp(time_option, "print-time") == 0)
+			my_printer.cfg.time = PRINT_TIME;
+		else if (strcmp(time_option, "print-time-full") == 0)
+			my_printer.cfg.time = PRINT_TIME_FULL;
+		else if (strcmp(time_option, "time-left-slicer") == 0)
+			my_printer.cfg.time = TIME_LEFT_SLICER;
+		else if (strcmp(time_option, "time-left-file") == 0)
+			my_printer.cfg.time = TIME_LEFT_FILE;
+		else if (strcmp(time_option, "time-left-avg") == 0)
+			my_printer.cfg.time = TIME_LEFT_AVG;
+		else if (strcmp(time_option, "time-eta") == 0)
+			my_printer.cfg.time = TIME_ETA;
+	} while (0);
 
 	LOG_INFO("host: %s", my_printer.cfg.host);
 	LOG_INFO("serial: %s", my_printer.cfg.serial);
 
 	//*** CURL INIT START ***//
 
-	char *status_querry_address = "/printer/objects/query";
-	char *status_querry_command =
+	char *status_query_address = "/printer/objects/query";
+	char *status_query_command =
 		"extruder=temperature,target&heater_bed=temperature,target&fan=speed&"
 		"gcode_move=position,speed_factor&virtual_sdcard=progress&print_stats&"
 		"filament_switch_sensor%20Runout_Sensor=filament_detected";
@@ -213,8 +230,8 @@ main(int argc, char *argv[])
 		{
 			string_buffer_t sb;
 			http_time = clock();
-			if (curl_GET(my_printer.cfg.host, status_querry_address,
-						 status_querry_command, &sb) != NULL)
+			if (curl_GET(my_printer.cfg.host, status_query_address,
+						 status_query_command, &sb) != NULL)
 				ParsePrinterRespond(&sb, &my_printer);
 			string_buffer_finish(&sb);
 			// counter--;
@@ -268,7 +285,7 @@ line_process(char *line, char *usart_tx_buf, char *http_command,
 	}
 	else
 	{
-		/*** Replace all spacet to %20 ***/
+		/*** Replace all space to %20 ***/
 		sprintf(http_command, "/printer/gcode/script?script=");
 		char *command	 = http_command + strlen(http_command);
 		char *input_line = line;

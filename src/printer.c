@@ -11,10 +11,11 @@
 extern int serial_port;
 static int compare_files(const void *a, const void *b);
 
+static file_t *findFileByName(const char *filename, printer_t *printer);
+
 int
 initPrinter(printer_t *printer)
 {
-	string_buffer_initialize(&printer->printing_filename);
 	string_buffer_initialize(&printer->state);
 	return 0;
 }
@@ -64,6 +65,7 @@ addFile2List(file_t *file, printer_t *printer)
 	if (printer->files.qty == printer->files.cap)
 		expandFileList(printer);
 	printer->files.list[printer->files.qty].name	   = file->name;
+	printer->files.list[printer->files.qty].estimated_time = file->estimated_time;
 	printer->files.list[printer->files.qty++].modified = file->modified;
 
 	return 0;
@@ -125,19 +127,32 @@ again:
 				sscanf(statusRespond->ptr + t[i + 1].start, "%f", &printer->print_time);
 				i++;
 			}
+			else if (jsoneq(statusRespond->ptr, &t[i], "total_duration") == 0)
+			{
+				sscanf(statusRespond->ptr + t[i + 1].start, "%f", &printer->total_time);
+				i++;
+			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "filename") == 0)
 			{
-				char *name = strndup(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
-				if (strcmp(name, printer->printing_filename.ptr))
+				if (printer->printing_file == NULL)
 				{
-					if (printer->printing_filename.len)
+					char *name = strndup(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
+					/* It's normal situation when one push new file and start to print it.
+					 * We need to refresh files list if file not found
+					 */
+				retry:
+					if ((printer->printing_file = findFileByName(name, printer)) == NULL)
 					{
-						string_buffer_finish(&printer->printing_filename);
-						string_buffer_initialize(&printer->printing_filename);
+						if (getFileListFromServer(printer) != EXIT_SUCCESS)
+							break;
+						else
+							goto retry;
+
 					}
-					string_buffer_append(name, &printer->printing_filename);
+
+					fillFileData(printer->printing_file, printer);
+					free(name);
 				}
-				free(name);
 				i++;
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "state") == 0)
@@ -154,19 +169,34 @@ again:
 
 					/* So, if we came here - printer status was updated.
 					 * We need to notify display about this.
+					 TODO: move this code to separate function e.g. printerStateChange()
 					 */
 					if (strcmp("standby", printer->state.ptr) == 0)
+					{
 						UART_Print("%s", "J12\r\n");
+						printer->printing_file = NULL;
+					}
 					else if (strcmp("printing", printer->state.ptr) == 0)
 						UART_Print("%s", "J04\r\n");
 					else if (strcmp("paused", printer->state.ptr) == 0)
 						UART_Print("%s", "J18\r\n");
 					else if (strcmp("complete", printer->state.ptr) == 0)
+					{
+						UART_Print("A7V %dH %dM\r\n", ((int)printer->total_time) / 3600,
+								   (((int)printer->total_time) % 3600) / 60);
 						UART_Print("%s", "J14\r\n");
+						printer->printing_file = NULL;
+					}
 					else if (strcmp("error", printer->state.ptr) == 0)
+					{
 						UART_Print("%s", "J16\r\n");
+						printer->printing_file = NULL;
+					}
 					else if (strcmp("cancelled", printer->state.ptr) == 0)
+					{
 						UART_Print("%s", "J16\r\n");
+						printer->printing_file = NULL;
+					}
 				}
 				free(state);
 				i++;
@@ -249,8 +279,7 @@ again:
 int
 getFileListFromServer(printer_t *printer)
 {
-	static int filesBufSize = 8;
-	// jsmntok_t	   *curtok		 = NULL;
+	static int		filesBufSize = 8;
 	jsmn_parser		jp;
 	string_buffer_t filesRespond;
 	jsmntok_t	   *t = calloc(filesBufSize, sizeof(jsmntok_t));
@@ -298,7 +327,7 @@ again:
 		{
 			if (jsoneq(filesRespond.ptr, &t[i], "path") == 0)
 			{
-				file_t new_file = {NULL, 0};
+				file_t new_file = {NULL, 0, 0};
 				new_file.name	= strndup(filesRespond.ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
 				sscanf(filesRespond.ptr + t[i + 3].start, "%lf", &new_file.modified);
 				addFile2List(&new_file, printer);
@@ -319,4 +348,86 @@ again:
 	string_buffer_finish(&filesRespond);
 	free(t);
 	return EXIT_SUCCESS;
+}
+
+float
+time_calc(printer_t *printer)
+{
+	float print_time = 0.0;
+	if (printer->printing_file == NULL)
+		return 0.0;
+	if (printer->printing_file->estimated_time <= 0)
+		fillFileData(printer->printing_file, printer);
+	switch (printer->cfg.time)
+	{
+		case PRINT_TIME:
+			print_time = printer->print_time;
+			break;
+		case PRINT_TIME_FULL:
+			print_time = printer->total_time;
+			break;
+		case TIME_LEFT_SLICER:
+			print_time = (printer->printing_file->estimated_time - printer->print_time);
+			break;
+		case TIME_LEFT_FILE:
+			if (printer->progress)
+				print_time = (printer->print_time / printer->progress - printer->print_time);
+			break;
+		case TIME_LEFT_AVG:
+			print_time = ((printer->printing_file->estimated_time - printer->print_time) +
+						  (printer->print_time / printer->progress - printer->print_time)) /
+						 2;
+			break;
+		case TIME_ETA:
+			do
+			{
+				struct tm tm = *localtime(&(time_t){time(NULL)});
+				print_time	 = (float)(((time_t)(tm.tm_hour * 60 + tm.tm_min) * 60) +
+									   (time_t)(printer->printing_file->estimated_time - printer->print_time));
+			} while (0);
+			break;
+	}
+	return print_time < 0 ? 0.0 : print_time;
+}
+
+int
+fillFileData(file_t *file, printer_t *printer)
+{
+	string_buffer_t respond;
+	char			command[2048];
+	char		   *urlfilename = NULL;
+
+	/* Nothing to do if fields are filled */
+	if (file->estimated_time > 0 && file->modified > 0)
+		return 0;
+
+	urlfilename = urlEncode(file->name, strlen(file->name));
+	sprintf(command, "filename=%s", urlfilename);
+	free(urlfilename);
+
+	if ((curl_GET(printer->cfg.host, "/server/files/metadata", command, &respond) == NULL) ||
+		!strstr(respond.ptr, "HTTP/1.1 200 OK"))
+		return -1;
+	else
+	{
+		char *start = 0;
+		if (file->estimated_time == 0 && ((start = strstr(respond.ptr, "estimated_time")) != NULL))
+			sscanf(start, "estimated_time\": %f", &file->estimated_time);
+		if (file->modified == 0 && ((start = strstr(respond.ptr, "modified")) != NULL))
+			sscanf(start, "modified\": %lf", &file->modified);
+	}
+
+	return 0;
+}
+
+static file_t *
+findFileByName(const char *filename, printer_t *printer)
+{
+	for (size_t i = 0; i < printer->files.qty; i++)
+	{
+		if (strcmp(filename, printer->files.list[i].name) == 0)
+			return &printer->files.list[i];
+	}
+
+	return NULL;
 }

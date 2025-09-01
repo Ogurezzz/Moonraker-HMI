@@ -15,3 +15,12 @@ serial: /dev/null
 #abs_hotend: 240
 #	Extruder temperature to be set on Preheat ABS LCD button press
 #abs_heatbed:100
+
+[time]
+#time_stat: print-time
+#	print-time - total print time without heating time.
+#	print-time-full - total print time with heating time included.
+#	time-left-slicer - time, calculated by slicer program.
+#	time-left-file - time, depends on gcode-file size.
+#	time-left-avg - Average between time-left-slicer and time-left-file.
+#	time-eta - Estimate Time Arrival.
