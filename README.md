@@ -20,6 +20,7 @@ Update
 cd ~/Moonraker-HMI
 git pull
 make
+sudo service moonraker-hmi restart
 ```
 Restart service after update.
 
