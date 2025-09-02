@@ -175,7 +175,7 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				{
 					int value = 0;
 					sscanf(command, "A18 S%d", &value);
-					sprintf(http_command, "script=M106%%20S%d", value);
+					sprintf(http_command, "script=M106%%20S%d", (value * 255) / 100);
 					if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
 						LOG_ERR("Fan speed error: '%s'", command);
 				} while (0);
@@ -188,7 +188,20 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				remove_sent	 = false;
 				break;
 			case 20: /* Set printing rate speed */
-				snprintf(respond, RESPOND_BUF_SIZE, "A20V %.0f\r\n", printer->feed_rate * 100);
+				do
+				{
+					int value = 0;
+					if (sscanf(command, "A20 S%d", &value) == 1)
+					{
+						sprintf(http_command, "script=M220%%20S%d", value);
+						if (curl_POST(printer->cfg.host, "/printer/gcode/script", http_command, &strbuf) == NULL)
+							LOG_ERR("Print speed error: '%s'", command);
+					}
+					else
+					{
+						snprintf(respond, RESPOND_BUF_SIZE, "A20V %.0f\r\n", printer->feed_rate * 100);
+					}
+				} while (0);
 				break;
 			case 21: /* Home */
 				do
