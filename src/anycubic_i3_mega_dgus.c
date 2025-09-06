@@ -59,22 +59,20 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 
 				break;
 			case 8: /* Files list select */
-				int filenum = 0;
+				size_t filenum = 0;
 				if (printer->files.qty == 0)
 					makeRespond(NO_SD_CARD);
 				else
 				{
 					int written_bytes = 0;
-					sscanf(command, "A8 S%d\r", &filenum);
-					DEBUG_LOG("File #: %d\n", filenum);
+					sscanf(command, "A8 S%ld\r", &filenum);
+					DEBUG_LOG("File #: %ld\n", filenum);
 					written_bytes =
 						snprintf(respond, RESPOND_BUF_SIZE, "FN \r\n");
-					for (int i = filenum;
-						 i < (filenum + 4) && i < printer->files.qty; i++)
+					for (size_t i = filenum; i < (filenum + 4) && i < printer->files.qty; i++)
 					{
-						written_bytes += snprintf(
-							respond + written_bytes,
-							RESPOND_BUF_SIZE - written_bytes, "%d\r\n", i);
+						written_bytes +=
+							snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes, "%ld\r\n", i);
 						written_bytes +=
 							snprintf(respond + written_bytes,
 									 RESPOND_BUF_SIZE - written_bytes, "%s\r\n",
