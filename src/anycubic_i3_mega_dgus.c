@@ -118,7 +118,7 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 				do
 				{
 					char *urlfilename = NULL;
-					if (strcmp("printing", printer->state.ptr) == 0)
+					if (printer->state == PRINTING)
 					{
 						/* If file already in print - do noting */
 						if (printer->selected_file == printer->printing_file)
