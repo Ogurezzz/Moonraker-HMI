@@ -12,11 +12,11 @@ extern int serial_port;
 static int compare_files(const void *a, const void *b);
 
 static file_t *findFileByName(const char *filename, printer_t *printer);
+static print_state_t parsePrinterState(const char *state, size_t len);
 
 int
 initPrinter(printer_t *printer)
 {
-	string_buffer_initialize(&printer->state);
 	return 0;
 }
 
@@ -134,7 +134,7 @@ again:
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "filename") == 0)
 			{
-				if (printer->printing_file == NULL)
+				if ((printer->state == PRINTING || printer->state == PAUSED) && printer->printing_file == NULL)
 				{
 					char *name = strndup(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
 					/* It's normal situation when one push new file and start to print it.
@@ -157,48 +157,55 @@ again:
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "state") == 0)
 			{
-				char *state = strndup(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
-				if (strcmp(state, printer->state.ptr))
+				print_state_t state =
+					parsePrinterState(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
+
+				if (state != printer->state)
 				{
-					if (printer->state.len)
-					{
-						string_buffer_finish(&printer->state);
-						string_buffer_initialize(&printer->state);
-					}
-					string_buffer_append(state, &printer->state);
+					printer->state = state;
 
 					/* So, if we came here - printer status was updated.
 					 * We need to notify display about this.
 					 TODO: move this code to separate function e.g. printerStateChange()
 					 */
-					if (strcmp("standby", printer->state.ptr) == 0)
+					switch (printer->state)
 					{
-						UART_Print("%s", "J12\r\n");
-						printer->printing_file = NULL;
-					}
-					else if (strcmp("printing", printer->state.ptr) == 0)
-						UART_Print("%s", "J04\r\n");
-					else if (strcmp("paused", printer->state.ptr) == 0)
-						UART_Print("%s", "J18\r\n");
-					else if (strcmp("complete", printer->state.ptr) == 0)
-					{
-						UART_Print("A7V %dH %dM\r\n", ((int)printer->total_time) / 3600,
-								   (((int)printer->total_time) % 3600) / 60);
-						UART_Print("%s", "J14\r\n");
-						printer->printing_file = NULL;
-					}
-					else if (strcmp("error", printer->state.ptr) == 0)
-					{
-						UART_Print("%s", "J16\r\n");
-						printer->printing_file = NULL;
-					}
-					else if (strcmp("cancelled", printer->state.ptr) == 0)
-					{
-						UART_Print("%s", "J16\r\n");
-						printer->printing_file = NULL;
+						case STANDBY:
+							UART_Print("J%02d\r\n", READY);
+							printer->printing_file = NULL;
+							break;
+						case PRINTING:
+							UART_Print("J%02d\r\n", PRINT_FROM_SD);
+							break;
+						case PAUSED:
+							UART_Print("J%02d\r\n", PAUSE_SUCCESS);
+							break;
+						case COMPLETE:
+							/* In case if we didn't read time yet - set state to PRINTING until next read */
+							if (printer->total_time == 0)
+							{
+								printer->state = PRINTING;
+								break;
+							}
+							UART_Print("A7V %dH %dM\r\n", ((int)printer->total_time) / 3600,
+									   (((int)printer->total_time) % 3600) / 60);
+							UART_Print("J%02d\r\n", PRINTING_DONE);
+							printer->printing_file = NULL;
+							break;
+						case ERR_STATE:
+							UART_Print("J%02d\r\n", STOP_PRINT);
+							printer->printing_file = NULL;
+							break;
+						case CANCELLED:
+							UART_Print("J%02d\r\n", STOP_PRINT);
+							printer->printing_file = NULL;
+							break;
+						case INVALID_STATE:
+							UART_Print("J%02d\r\n", MAINBOARD_RESET);
+							printer->printing_file = NULL;
+							break;
 					}
 				}
-				free(state);
 				i++;
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "fan") == 0)
@@ -430,4 +437,25 @@ findFileByName(const char *filename, printer_t *printer)
 	}
 
 	return NULL;
+}
+
+static print_state_t
+parsePrinterState(const char *state, size_t len)
+{
+	if (len == 0)
+		return INVALID_STATE;
+	else if (strncmp("standby", state, len) == 0)
+		return STANDBY;
+	else if (strncmp("printing", state, len) == 0)
+		return PRINTING;
+	else if (strncmp("paused", state, len) == 0)
+		return PAUSED;
+	else if (strncmp("complete", state, len) == 0)
+		return COMPLETE;
+	else if (strncmp("error", state, len) == 0)
+		return ERR_STATE;
+	else if (strncmp("cancelled", state, len) == 0)
+		return CANCELLED;
+	else
+		return INVALID_STATE;
 }

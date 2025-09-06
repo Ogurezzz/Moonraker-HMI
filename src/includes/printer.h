@@ -35,9 +35,20 @@ typedef enum
 	TIME_ETA
 } time_option_t;
 
+typedef enum
+{
+	INVALID_STATE,
+	STANDBY,
+	PRINTING,
+	PAUSED,
+	COMPLETE,
+	ERR_STATE,
+	CANCELLED
+} print_state_t;
+
 typedef struct
 {
-	string_buffer_t state;
+	print_state_t	state;
 	file_t		   *printing_file;
 	file_t		   *selected_file;
 	float			extruder_temp;

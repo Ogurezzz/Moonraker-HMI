@@ -52,13 +52,12 @@ main(int argc, char *argv[])
 	char   *config_path = DEFAULT_CONFIG_PATH;
 
 	LOG_INFO("Moonraker-HMI service v%s starting...", VERSION);
-	if (argv[2] != NULL)
+	if (argc > 2)
 	{
 		LOG_ERR("Too many arguments.%s", "");
 		exit(EXIT_FAILURE);
 	}
-
-	if (argv[1] != NULL)
+	else if (argc == 2)
 	{
 		config_path = argv[1];
 	}
@@ -178,7 +177,7 @@ main(int argc, char *argv[])
 	}
 
 	//*** SERIAL INIT END ***//
-	initPrinter(&my_printer);
+	// initPrinter(&my_printer);
 #ifdef DRY_RUN
 	DEBUG_LOG("%s\n", "Dry run mode!");
 #endif
