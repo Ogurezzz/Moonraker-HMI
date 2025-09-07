@@ -6,6 +6,8 @@
 
 #define RESPOND_BUF_SIZE 1024
 int react(printer_t *printer, char *command, string_buffer_t *uart_respond);
+void setPrinterState(print_state_t new_state, printer_t *printer);
+void resetStatus(printer_t *printer);
 
 typedef enum reactions_uart_respond
 {

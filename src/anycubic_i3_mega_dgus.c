@@ -293,3 +293,67 @@ makeRespond(reactions_uart_respond_t rsp)
 {
 	snprintf(respond, RESPOND_BUF_SIZE, "J%02d\r\n", rsp);
 }
+
+void
+setPrinterState(print_state_t new_state, printer_t *printer)
+{
+	/* Do nothing if no change of state */
+	if (printer->state == new_state)
+		return;
+
+	printer->state = new_state;
+	switch (new_state)
+	{
+		case STANDBY:
+			UART_Print("J%02d\r\n", READY);
+			printer->printing_file = NULL;
+			break;
+		case PRINTING:
+			UART_Print("J%02d\r\n", PRINT_FROM_SD);
+			break;
+		case PAUSED:
+			UART_Print("J%02d\r\n", PAUSE_SUCCESS);
+			break;
+		case COMPLETE:
+			/* In case if we didn't read time yet - set state to PRINTING until next read */
+			if (printer->total_time == 0)
+			{
+				printer->state = PRINTING;
+				break;
+			}
+			UART_Print("A7V %dH %dM\r\n", ((int)printer->total_time) / 3600, (((int)printer->total_time) % 3600) / 60);
+			UART_Print("J%02d\r\n", PRINTING_DONE);
+			printer->printing_file = NULL;
+			break;
+		case ERR_STATE:
+			UART_Print("J%02d\r\n", MAINBOARD_RESET);
+			resetStatus(printer);
+			printer->printing_file = NULL;
+			break;
+		case CANCELLED:
+			UART_Print("J%02d\r\n", MAINBOARD_RESET);
+			printer->printing_file = NULL;
+			break;
+		case INVALID_STATE:
+			UART_Print("J%02d\r\n", MAINBOARD_RESET);
+			printer->printing_file = NULL;
+			break;
+	}
+}
+void
+resetStatus(printer_t *printer)
+{
+	printer->extruder_target = 0;
+	printer->extruder_temp	 = 0;
+	printer->heatbed_target	 = 0;
+	printer->heatbed_temp	 = 0;
+	printer->fan_speed		 = 0;
+	printer->feed_rate		 = 0;
+	printer->print_time		 = 0;
+	printer->progress		 = 0;
+	printer->total_time		 = 0;
+	printer->position.E		 = 0;
+	printer->position.X		 = 0;
+	printer->position.Y		 = 0;
+	printer->position.Z		 = 0;
+}
