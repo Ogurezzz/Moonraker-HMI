@@ -110,7 +110,17 @@ again:
 	{
 		for (i = 1; i < r; i++)
 		{
-			if (jsoneq(statusRespond->ptr, &t[i], "progress") == 0)
+			if (jsoneq(statusRespond->ptr, &t[i], "error") == 0)
+			{
+				unsigned int err = 0;
+				if (sscanf(statusRespond->ptr + t[i + 3].start, "%d", &err) == 1 && err > 0)
+				{
+					setPrinterState(ERR_STATE, printer);
+					break;
+				}
+				i++;
+			}
+			else if (jsoneq(statusRespond->ptr, &t[i], "progress") == 0)
 			{
 				/* We may use strndup() to fetch string value */
 				sscanf(statusRespond->ptr + t[i + 1].start, "%f", &printer->progress);
@@ -159,53 +169,7 @@ again:
 			{
 				print_state_t state =
 					parsePrinterState(statusRespond->ptr + t[i + 1].start, t[i + 1].end - t[i + 1].start);
-
-				if (state != printer->state)
-				{
-					printer->state = state;
-
-					/* So, if we came here - printer status was updated.
-					 * We need to notify display about this.
-					 TODO: move this code to separate function e.g. printerStateChange()
-					 */
-					switch (printer->state)
-					{
-						case STANDBY:
-							UART_Print("J%02d\r\n", READY);
-							printer->printing_file = NULL;
-							break;
-						case PRINTING:
-							UART_Print("J%02d\r\n", PRINT_FROM_SD);
-							break;
-						case PAUSED:
-							UART_Print("J%02d\r\n", PAUSE_SUCCESS);
-							break;
-						case COMPLETE:
-							/* In case if we didn't read time yet - set state to PRINTING until next read */
-							if (printer->total_time == 0)
-							{
-								printer->state = PRINTING;
-								break;
-							}
-							UART_Print("A7V %dH %dM\r\n", ((int)printer->total_time) / 3600,
-									   (((int)printer->total_time) % 3600) / 60);
-							UART_Print("J%02d\r\n", PRINTING_DONE);
-							printer->printing_file = NULL;
-							break;
-						case ERR_STATE:
-							UART_Print("J%02d\r\n", STOP_PRINT);
-							printer->printing_file = NULL;
-							break;
-						case CANCELLED:
-							UART_Print("J%02d\r\n", STOP_PRINT);
-							printer->printing_file = NULL;
-							break;
-						case INVALID_STATE:
-							UART_Print("J%02d\r\n", MAINBOARD_RESET);
-							printer->printing_file = NULL;
-							break;
-					}
-				}
+				setPrinterState(state, printer);
 				i++;
 			}
 			else if (jsoneq(statusRespond->ptr, &t[i], "fan") == 0)
