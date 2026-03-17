@@ -59,27 +59,27 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 
 				break;
 			case 8: /* Files list select */
-				size_t filenum = 0;
-				if (printer->files.qty == 0)
-					makeRespond(NO_SD_CARD);
-				else
+				do
 				{
-					int written_bytes = 0;
-					sscanf(command, "A8 S%ld\r", &filenum);
-					DEBUG_LOG("File #: %ld\n", filenum);
-					written_bytes =
-						snprintf(respond, RESPOND_BUF_SIZE, "FN \r\n");
-					for (size_t i = filenum; i < (filenum + 4) && i < printer->files.qty; i++)
+					size_t filenum = 0;
+					if (printer->files.qty == 0)
+						makeRespond(NO_SD_CARD);
+					else
 					{
-						written_bytes +=
-							snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes, "%ld\r\n", i);
-						written_bytes +=
-							snprintf(respond + written_bytes,
-									 RESPOND_BUF_SIZE - written_bytes, "%s\r\n",
-									 printer->files.list[i].name);
+						int written_bytes = 0;
+						sscanf(command, "A8 S%zu\r", &filenum);
+						DEBUG_LOG("File #: %zu\n", filenum);
+						written_bytes = snprintf(respond, RESPOND_BUF_SIZE, "FN \r\n");
+						for (size_t i = filenum; i < (filenum + 4) && i < printer->files.qty; i++)
+						{
+							written_bytes +=
+								snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes, "%zu\r\n", i);
+							written_bytes += snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes,
+													  "%s\r\n", printer->files.list[i].name);
+						}
+						written_bytes += snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes, "END\r\n");
 					}
-					written_bytes += snprintf(respond + written_bytes, RESPOND_BUF_SIZE - written_bytes, "END\r\n");
-				}
+				} while (0);
 				break;
 			case 9: /* Pause print */
 				if (curl_POST(printer->cfg.host, "/printer/gcode/script", "script=PAUSE", &strbuf) != NULL)
@@ -100,14 +100,14 @@ react(printer_t *printer, char *command, string_buffer_t *uart_respond)
 			case 13: /* Select file */
 				do
 				{
-					int fileNum = 0;
-					if (sscanf(command, "A13 %d\r", &fileNum) != 1)
+					size_t fileNum = 0;
+					if (sscanf(command, "A13 %zu\r", &fileNum) != 1)
 					{
 						makeRespond(FILE_OPEN_FAIL);
 						break;
 					}
 					printer->selected_file = &printer->files.list[fileNum];
-					DEBUG_LOG("Selected file: #%4d %s\n", fileNum, printer->selected_file->name);
+					DEBUG_LOG("Selected file: #%4zu %s\n", fileNum, printer->selected_file->name);
 					if (fillFileData(printer->selected_file, printer) < 0)
 						makeRespond(FILE_OPEN_FAIL);
 					else
